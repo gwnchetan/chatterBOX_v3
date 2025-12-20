@@ -741,86 +741,91 @@
 }
 
 /* --- Register Mode Compact Layout --- */
-.register-mode {
-    padding-top: 2rem !important;
-    /* Ensure space from top */
-    justify-content: flex-start !important;
-    /* Start from top to fit everything */
-}
+/* --- Register Mode Compact Layout (Mobile Only) --- */
+@media (max-width: 768px) {
+    .register-mode {
+        padding-top: 2rem !important;
+        /* Ensure space from top */
+        justify-content: flex-start !important;
+        /* Start from top to fit everything */
+    }
 
-/* Reduce spacing specifically for register mode to avoid scrolling */
-.register-mode .brand-header {
-    margin-bottom: 0.5rem;
-    /* Drastically reduced from 3rem */
-    transform: scale(0.9);
-    /* Slightly smaller brand */
-    transform-origin: left center;
-}
+    /* Reduce spacing specifically for register mode to avoid scrolling */
+    .register-mode .brand-header {
+        margin-bottom: 0.5rem;
+        /* Drastically reduced from 3rem */
+        transform: scale(0.9);
+        /* Slightly smaller brand */
+        transform-origin: center top;
+        margin-top: 2.5rem;
+        /* Push down to clear button */
+    }
 
-.register-mode .login-title {
-    margin-bottom: 1rem;
-    font-size: 1.75rem;
-    /* Smaller title */
-}
+    .register-mode .login-title {
+        margin-bottom: 1rem;
+        font-size: 1.75rem;
+        /* Smaller title */
+    }
 
-.register-mode .login-form {
-    gap: 0.8rem;
-    /* Tighter gap between inputs */
-}
+    .register-mode .login-form {
+        gap: 0.8rem;
+        /* Tighter gap between inputs */
+    }
 
-.register-mode .input-group {
-    margin-bottom: 0;
-}
+    .register-mode .input-group {
+        margin-bottom: 0;
+    }
 
-.register-mode .login-input {
-    padding: 0.6rem 0.6rem 0.6rem 2.8rem;
-    /* Compact padding */
-    font-size: 0.9rem;
-    height: auto;
-}
+    .register-mode .login-input {
+        padding: 0.6rem 0.6rem 0.6rem 2.8rem;
+        /* Compact padding */
+        font-size: 0.9rem;
+        height: auto;
+    }
 
-.register-mode .input-icon {
-    width: 1rem;
-    height: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    left: 1rem;
-}
+    .register-mode .input-icon {
+        width: 1rem;
+        height: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        left: 1rem;
+    }
 
-.register-mode .login-input:focus {
-    box-shadow: 0 0 0 2px var(--color-primary-alpha);
-}
+    .register-mode .login-input:focus {
+        box-shadow: 0 0 0 2px var(--color-primary-alpha);
+    }
 
-.register-mode .login-button {
-    padding: 0.7rem;
-    margin-top: 0.5rem;
-    font-size: 1rem;
-}
+    .register-mode .login-button {
+        padding: 0.7rem;
+        margin-top: 0.5rem;
+        font-size: 1rem;
+    }
 
-.register-mode .divider {
-    margin: 0.8rem 0;
-    font-size: 0.8rem;
-}
+    .register-mode .divider {
+        margin: 0.8rem 0;
+        font-size: 0.8rem;
+    }
 
-.register-mode .social-login {
-    margin-top: 0;
-    gap: 0.8rem;
-}
+    .register-mode .social-login {
+        margin-top: 0;
+        gap: 0.8rem;
+    }
 
-.register-mode .social-btn {
-    width: 2.5rem;
-    height: 2.5rem;
-}
+    .register-mode .social-btn {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
 
-.register-mode .social-btn svg {
-    width: 1.2rem;
-    height: 1.2rem;
-}
+    .register-mode .social-btn svg {
+        width: 1.2rem;
+        height: 1.2rem;
+    }
 
-.register-mode .signup-link {
-    margin-top: 0.8rem;
-    font-size: 0.8rem;
-    padding-bottom: 0;
+    .register-mode .signup-link {
+        margin-top: 0.8rem;
+        font-size: 0.8rem;
+        padding-bottom: 0;
+    }
 }
 
 /* Fix overlap on mobile/smaller screens */
@@ -832,9 +837,13 @@
         font-size: 0.75rem;
     }
 
-    .register-mode .brand-header {
-        margin-top: 2.5rem;
-        /* Push down to clear button */
-        transform-origin: center top;
+    /* Fix overlap on mobile/smaller screens - Already handled above */
+    @media (max-width: 768px) {
+        .theme-toggle-btn {
+            top: 1rem;
+            right: 1rem;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.75rem;
+        }
     }
 }

@@ -58,60 +58,55 @@
 :root,
 [data-theme="dark"] {
   --color-bg: #0f172a;
-  /* Slate 900 */
   --color-surface: #1e293b;
-  /* Slate 800 */
   --color-text-main: #F5EBFA;
-  /* Lightest Purple */
   --color-text-muted: #94a3b8;
-  /* Slate 400 */
 
   --color-primary: #A56ABD;
-  /* Medium Purple */
   --color-primary-hover: #E7DBEF;
-  /* Light Lavender */
   --color-primary-alpha: rgba(165, 106, 189, 0.25);
-  /* For shadows */
 
   --color-secondary: #334155;
-  /* Slate 700 */
   --color-border: #475569;
-  /* Slate 600 */
   --color-accent: #6E3482;
-  /* Deep Purple */
 
   --color-input-bg: transparent;
   --color-error: #ef4444;
-  /* Red 500 */
+
+  /* Strict Toast Variables */
+  --surface-bg: var(--color-surface);
+  --text-main: var(--color-text-main);
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  --error: #ef4444;
 }
 
 /* --- Theme: LIGHT --- */
 [data-theme="light"] {
   --color-bg: #F5EBFA;
-  /* Lightest Purple/White */
   --color-surface: #ffffff;
-  /* Pure White */
   --color-text-main: #49225B;
-  /* Deepest Purple */
   --color-text-muted: #64748b;
-  /* Slate 500 */
 
   --color-primary: #6E3482;
-  /* Main Purple */
   --color-primary-hover: #49225B;
-  /* Darker Purple */
   --color-primary-alpha: rgba(110, 52, 130, 0.25);
 
   --color-secondary: #E7DBEF;
-  /* Light Lavender */
   --color-border: #E7DBEF;
-  /* Light Lavender */
   --color-accent: #A56ABD;
-  /* Medium Purple */
 
   --color-input-bg: #ffffff;
   --color-error: #dc2626;
-  /* Red 600 */
+
+  /* Strict Toast Variables */
+  --surface-bg: var(--color-surface);
+  --text-main: var(--color-text-main);
+  --success: #16a34a;
+  --warning: #d97706;
+  --info: #2563eb;
+  --error: #dc2626;
 }
 
 /* --- Global Reset & Defaults --- */
@@ -129,6 +124,8 @@ body {
   font-family: var(--font-main);
   transition: background-color 0.3s ease, color 0.3s ease;
   line-height: 1.5;
+  overflow-x: hidden;
+  /* Prevent horizontal scroll from toast animations */
 }
 
 button,

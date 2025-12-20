@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import './login.css';
+import { useToast } from '../components/Toast';
+import { useGoogleLogin } from '@react-oauth/google';
 import loginIllustration from '../assets/login.png';
 
 function Login() {
@@ -13,6 +15,7 @@ function Login() {
     });
 
     const [errors, setErrors] = useState({});
+    const [showPassword, setShowPassword] = useState(false);
 
     const togglePasswordVisibility = () => {
         setShowPassword(!showPassword);
@@ -25,10 +28,19 @@ function Login() {
         setFormData({ username: '', fullname: '', email: '', password: '', confirmPassword: '' });
     };
 
-    // DEMO ONLY: Theme Toggle Function
+    // Theme Management
+    const [theme, setTheme] = useState('dark');
+
+    React.useEffect(() => {
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        setTheme(savedTheme);
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    }, []);
+
     const toggleTheme = () => {
-        const currentTheme = document.documentElement.getAttribute('data-theme');
-        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        const newTheme = theme === 'light' ? 'dark' : 'light';
+        setTheme(newTheme);
+        localStorage.setItem('theme', newTheme);
         document.documentElement.setAttribute('data-theme', newTheme);
     };
 
@@ -83,39 +95,128 @@ function Login() {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = (e) => {
+    const [isLoading, setIsLoading] = useState(false);
+    const { success, error } = useToast();
+
+    const googleLogin = useGoogleLogin({
+        onSuccess: async (tokenResponse) => {
+            try {
+                setIsLoading(true);
+                const res = await fetch('http://localhost:5000/api/auth/google', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ token: tokenResponse.access_token }),
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.message || 'Google Login Failed');
+                }
+
+                success("Google Login Successful!");
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                // navigate('/dashboard');
+
+            } catch (err) {
+                console.error("Google Auth Error:", err);
+                error(err.message);
+            } finally {
+                setIsLoading(false);
+            }
+        },
+        onError: error => console.log('Login Failed:', error)
+    });
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (validateForm()) {
-            console.log("Form Submitted Successfully", formData);
-            // Verify backend call would go here
+
+        if (!validateForm()) {
+            error("Please fix the validation errors.");
+            return;
+        }
+
+        setIsLoading(true);
+
+        const endpoint = isRegister
+            ? 'http://localhost:5000/api/auth/register'
+            : 'http://localhost:5000/api/auth/login';
+
+        const payload = isRegister
+            ? {
+                username: formData.username,
+                fullname: formData.fullname,
+                email: formData.email,
+                password: formData.password
+            }
+            : {
+                username: formData.email, // Allow email or username login
+                password: formData.password
+            };
+
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                // Handle specific backend errors
+                throw new Error(data.message || 'Something went wrong');
+            }
+
+            // Success
+            success(isRegister ? "Registration Successful! Please Login." : "Login Successful!");
+
+            if (!isRegister) {
+                // Save token and user data
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                // Here you would typically navigate to the dashboard
+                // navigate('/dashboard'); 
+            } else {
+                // If registered, maybe switch to login view automatically
+                setIsRegister(false);
+                setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
+            }
+
+        } catch (err) {
+            console.error("Auth Error:", err);
+            error(err.message);
+        } finally {
+            setIsLoading(false);
         }
     };
 
     return (
         <div className="login-container">
-            {/* DEMO: Theme Toggle Button */}
+            {/* Theme Toggle Button */}
             <button
                 onClick={toggleTheme}
-                style={{
-                    position: 'absolute',
-                    top: '1rem',
-                    right: '1rem',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '99px',
-                    border: '1px solid var(--color-border)',
-                    background: 'var(--color-surface)',
-                    color: 'var(--color-text-main)',
-                    cursor: 'pointer',
-                    zIndex: 1000,
-                    fontWeight: 600
-                }}
+                className="theme-toggle-btn"
             >
-                🌗 Switch Theme
+                {theme === 'light' ? '🌙' : '☀️'} Switch Theme
             </button>
 
             <div className="login-wrapper">
                 {/* Left Side - Form */}
-                <div className="login-form-section">
+                <div className={`login-form-section ${isRegister ? 'register-mode' : ''}`}>
+                    <div className="brand-header">
+                        <h1 className="brand-logo">
+                            <span className="brand-text">chatter</span>
+                            <span className="brand-highlight">BOX</span>
+                        </h1>
+                        <p className="brand-tagline">Connect globally, chat locally.</p>
+                    </div>
+
                     <div className="form-content" key={isRegister ? "register" : "login"}>
                         <h1 className="login-title">
                             {isRegister ? "Create Account" : "Welcome Back!!"}
@@ -261,8 +362,8 @@ function Login() {
                                 </div>
                             )}
 
-                            <button type="submit" className="login-button">
-                                {isRegister ? "Sign Up" : "Login"}
+                            <button type="submit" className="login-button" disabled={isLoading}>
+                                {isLoading ? "Processing..." : (isRegister ? "Sign Up" : "Login")}
                             </button>
                         </form>
 
@@ -271,7 +372,7 @@ function Login() {
                         </div>
 
                         <div className="social-login">
-                            <button className="social-btn google">
+                            <button className="social-btn google" onClick={() => googleLogin()}>
                                 <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
@@ -303,6 +404,32 @@ function Login() {
                 {/* Right Side - Image/Illustration */}
                 <div className="login-image-section">
                     <div className="image-bg-shape"></div>
+
+                    {/* Live Interaction Elements */}
+                    <div className="chat-bubble bubble-1">
+                        <div className="bubble-avatar" style={{ background: '#EF4444' }}>JD</div>
+                        <div className="bubble-content">
+                            <p className="bubble-name">John Doe</p>
+                            <p className="bubble-text">Hey! checking out this new app 🚀</p>
+                        </div>
+                    </div>
+
+                    <div className="chat-bubble bubble-2">
+                        <div className="bubble-avatar" style={{ background: '#3B82F6' }}>AS</div>
+                        <div className="bubble-content">
+                            <p className="bubble-name">Alice Smith</p>
+                            <p className="bubble-text">The UI is so clean! ✨</p>
+                        </div>
+                    </div>
+
+                    <div className="notification-card">
+                        <span className="bell-icon">🔔</span>
+                        <div className="notif-text">
+                            <p>New Friend Request</p>
+                            <span>Just now</span>
+                        </div>
+                    </div>
+
                     <img src={loginIllustration} alt="Login Illustration" className="login-illustration" />
                 </div>
             </div>

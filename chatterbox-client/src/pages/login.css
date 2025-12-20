@@ -27,9 +27,20 @@
     padding: 0 10%;
     width: 50%;
     background-color: var(--color-surface);
+    background-color: var(--color-surface);
     overflow-y: auto;
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE 10+ */
     position: relative;
     /* For absolute positioning if needed */
+}
+
+/* Hide Scrollbar */
+.login-form-section::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
 }
 
 /* Brand Styles */
@@ -738,6 +749,23 @@
 .theme-toggle-btn:hover {
     background: var(--color-bg);
     transform: translateY(-1px);
+}
+
+/* --- Register Mode Compact Layout (Desktop & General) --- */
+.register-mode .login-form {
+    gap: 1rem;
+    /* Reduced from 2rem for better fit on desktop */
+}
+
+.register-mode .brand-header {
+    margin-bottom: 1.5rem;
+    /* Reduced from 3rem */
+}
+
+.register-mode .login-title {
+    margin-bottom: 1.5rem;
+    font-size: 2rem;
+    /* Slightly smaller than 2.25rem */
 }
 
 /* --- Register Mode Compact Layout --- */

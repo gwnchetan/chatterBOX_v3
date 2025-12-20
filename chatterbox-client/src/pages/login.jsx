@@ -3,8 +3,10 @@ import './login.css';
 import { useToast } from '../components/Toast';
 import { useGoogleLogin } from '@react-oauth/google';
 import loginIllustration from '../assets/login.png';
+import { useNavigate } from 'react-router-dom';
 
 function Login() {
+    const navigate = useNavigate();
     const [isRegister, setIsRegister] = useState(false);
     const [formData, setFormData] = useState({
         username: '',
@@ -119,7 +121,7 @@ function Login() {
                 success("Google Login Successful!");
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('user', JSON.stringify(data.user));
-                // navigate('/dashboard');
+                navigate('/feed');
 
             } catch (err) {
                 console.error("Google Auth Error:", err);
@@ -181,7 +183,7 @@ function Login() {
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('user', JSON.stringify(data.user));
                 // Here you would typically navigate to the dashboard
-                // navigate('/dashboard'); 
+                navigate('/feed');
             } else {
                 // If registered, maybe switch to login view automatically
                 setIsRegister(false);

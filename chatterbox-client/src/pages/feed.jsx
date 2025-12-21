@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import './feed.css';
-import Sidebar from '../components/layout/Sidebar';
+import Navbar from '../components/layout/Navbar';
 import RightSidebar from '../components/layout/RightSidebar';
 import PostCard from '../components/feed/PostCard';
 import Avatar from '../components/common/Avatar';
@@ -36,7 +36,7 @@ const dummyPosts = [
 const Feed = () => {
     return (
         <div className="feed-layout">
-            <Sidebar />
+            <Navbar />
 
             <main className="feed-center">
                 {/* Header: Search & Create */}

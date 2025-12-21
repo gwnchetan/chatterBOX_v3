@@ -4,6 +4,8 @@
     min-height: 100vh;
     background-color: var(--color-bg);
     color: var(--color-text-main);
+    padding-left: 260px;
+    /* Offset for Fixed Navbar */
 }
 
 /* Sidebar (Left) - BLENDED (Muted) */
@@ -677,6 +679,7 @@
 @media (max-width: 1024px) {
     .feed-layout {
         flex-direction: column;
+        padding-left: 0;
     }
 
     .sidebar-left,

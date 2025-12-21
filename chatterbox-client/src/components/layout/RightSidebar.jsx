@@ -1,103 +1,99 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import Avatar from '../common/Avatar';
-import { UserPlus, MoreHorizontal } from '../common/Icons';
 
 const RightSidebar = () => {
+    const scrollContainerRef = useRef(null);
+
+    const stories = [
+        { id: 1, user: "Anatoly Pr...", img: "https://images.unsplash.com/photo-1542202229-7d93c33f5d07?auto=format&fit=crop&q=80&w=300", avatar: "https://i.pravatar.cc/150?u=a" },
+        { id: 2, user: "Lolita Earns", img: "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?auto=format&fit=crop&q=80&w=300", avatar: "https://i.pravatar.cc/150?u=b" },
+        { id: 3, user: "Mike T.", img: "https://images.unsplash.com/photo-1549419163-71887e1f4095?auto=format&fit=crop&q=80&w=300", avatar: "https://i.pravatar.cc/150?u=c" },
+        { id: 4, user: "Sarah J.", img: "https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&q=80&w=300", avatar: "https://i.pravatar.cc/150?u=d" },
+    ];
+
+    const requests = [
+        { id: 1, name: "Tyrell Barrows", text: "wants to add you to friends", avatar: "https://i.pravatar.cc/150?u=8" },
+        { id: 2, name: "Selena Gomez", text: "wants to add you to friends", avatar: "https://i.pravatar.cc/150?u=9" },
+        { id: 3, name: "John Doe", text: "wants to add you to friends", avatar: "https://i.pravatar.cc/150?u=10" },
+        { id: 4, name: "Jane Smith", text: "wants to add you to friends", avatar: "https://i.pravatar.cc/150?u=11" },
+        { id: 5, name: "Mike Johnson", text: "wants to add you to friends", avatar: "https://i.pravatar.cc/150?u=12" },
+    ];
+
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const handleWheel = (e) => {
+            if (e.deltaY !== 0) {
+                e.preventDefault();
+                container.scrollLeft += e.deltaY;
+            }
+        };
+
+        container.addEventListener('wheel', handleWheel, { passive: false });
+
+        return () => {
+            container.removeEventListener('wheel', handleWheel);
+        };
+    }, []);
+
     return (
         <aside className="sidebar-right">
-            <div className="right-section">
-                <div className="right-section-header">
-                    <div className="right-title">Requests <span className="badge-count">2</span></div>
+            {/* Partition 1: Stories */}
+            <div className="rs-partition partition-stories">
+                <h3 className="partition-title">Stories</h3>
+                <div className="stories-scroll-container" ref={scrollContainerRef}>
+                    {/* Add Story Card */}
+                    <div className="story-card add-story-card">
+                        <div className="story-bg-placeholder"></div>
+                        <div className="add-story-btn">
+                            <span>+</span>
+                        </div>
+                        <span className="story-username-overlay">Add Story</span>
+                    </div>
+
+                    {stories.map(story => (
+                        <div key={story.id} className="story-card">
+                            <img src={story.img} alt="" className="story-bg" />
+                            {/* Avatar floating top */}
+                            <div className="story-avatar-top">
+                                <Avatar src={story.avatar} size="sm" />
+                            </div>
+                            {/* Name floating bottom */}
+                            <span className="story-username-overlay">{story.user}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Partition 2: Requests */}
+            <div className="rs-partition partition-requests">
+                <div className="partition-header">
+                    <h3 className="right-title">REQUESTS</h3>
+                    <span className="badge-count">{requests.length}</span>
                 </div>
 
-                <div className="request-list">
-                    <div className="request-item">
-                        <Avatar size="md" alt="Lauralee" />
-                        <div className="request-info">
-                            <span className="req-name">Lauralee Quintero</span>
-                            <span className="req-action">wants to add you to friends</span>
-                            <div className="req-buttons">
-                                <span className="btn-accept">Accept</span>
-                                <span className="btn-decline">Decline</span>
+                <div className="requests-list">
+                    {requests.map(req => (
+                        <div key={req.id} className="request-card">
+                            <div className="req-top">
+                                <Avatar src={req.avatar} size="xs" />
+                                <div className="req-text">
+                                    <span className="req-name">{req.name}</span>
+                                    <span className="req-desc">{req.text}</span>
+                                </div>
+                            </div>
+                            <div className="req-actions">
+                                <button className="btn-req-accept">Accept</button>
+                                <button className="btn-req-decline">Decline</button>
                             </div>
                         </div>
-                    </div>
-                    <div className="request-item">
-                        <Avatar size="md" alt="Brittni" />
-                        <div className="request-info">
-                            <span className="req-name">Brittni Lando</span>
-                            <span className="req-action">wants to add you to friends</span>
-                            <div className="req-buttons">
-                                <span className="btn-accept">Accept</span>
-                                <span className="btn-decline">Decline</span>
-                            </div>
-                        </div>
-                    </div>
+                    ))}
                 </div>
             </div>
 
-            <div className="right-section">
-                <div className="right-section-header">
-                    <div className="right-title">Suggestions for you</div>
-                </div>
-                <div className="suggestion-list">
-                    <div className="suggestion-item">
-                        <Avatar size="md" alt="Chantal" />
-                        <div className="suggestion-info">
-                            <span className="req-name">Chantal Shelburne</span>
-                            <span className="req-action">Memphis, TN, US</span>
-                        </div>
-                        <div className="follow-btn-icon"><UserPlus style={{ width: 18 }} /></div>
-                    </div>
-                    <div className="suggestion-item">
-                        <Avatar size="md" alt="Marci" />
-                        <div className="suggestion-info">
-                            <span className="req-name">Marci Senter</span>
-                            <span className="req-action">Newark, NJ, US</span>
-                        </div>
-                        <div className="follow-btn-icon"><UserPlus style={{ width: 18 }} /></div>
-                    </div>
-                    <div className="suggestion-item">
-                        <Avatar size="md" alt="Janetta" />
-                        <div className="suggestion-info">
-                            <span className="req-name">Janetta Rotolo</span>
-                            <span className="req-action">Fort Worth, TX, US</span>
-                        </div>
-                        <div className="follow-btn-icon"><UserPlus style={{ width: 18 }} /></div>
-                    </div>
-                    <div className="suggestion-item">
-                        <Avatar size="md" alt="Tyra" />
-                        <div className="suggestion-info">
-                            <span className="req-name">Tyra Dhillon</span>
-                            <span className="req-action">Springfield, MA, US</span>
-                        </div>
-                        <div className="follow-btn-icon"><UserPlus style={{ width: 18 }} /></div>
-                    </div>
-
-                    <div style={{ marginTop: '1rem', color: 'var(--color-primary)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
-                        View All
-                    </div>
-                </div>
-            </div>
-
-            <div className="active-now-card">
-                <div className="active-avatars-stack">
-                    {/* Just visuals */}
-                    <Avatar size="sm" />
-                    <Avatar size="sm" />
-                    <Avatar size="sm" />
-                    <Avatar size="sm" />
-                </div>
-                <div className="active-stats">
-                    <h3>184.3K <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--color-text-muted)' }}>Followers</span></h3>
-                    <p>Active now on your profile</p>
-                </div>
-            </div>
-
-            <div className="footer-links">
-                About · Accessibility · Help Center <br />
-                Privacy and Terms · Advertising <br />
-                Business Services
+            <div className="rs-partition">
+                <h3>Partition 3</h3>
             </div>
         </aside>
     );

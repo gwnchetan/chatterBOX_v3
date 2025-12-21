@@ -50,8 +50,10 @@ const Navbar = () => {
         <nav className="navbar">
             {/* Logo Section */}
             <div className="logo-container">
-                <div className="logo-icon">💬</div>
-                <div className="logo-text">chatterBOX</div>
+                <h1 className="brand-logo">
+                    <span className="brand-text">chatter</span>
+                    <span className="brand-highlight">BOX</span>
+                </h1>
             </div>
 
             {/* Navigation Menu */}

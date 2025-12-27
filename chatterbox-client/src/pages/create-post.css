@@ -1,0 +1,524 @@
+/* --- GLOBAL RESET & VARIABLES --- */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Global Theme - Mapped Variables */
+.create-post-container {
+    --cp-bg: var(--color-bg);
+    --cp-surface: var(--color-surface);
+    --cp-border: var(--color-border);
+    --cp-text-main: var(--color-text-main);
+    --cp-text-muted: var(--color-text-muted);
+
+    --cp-primary: var(--color-primary);
+    --cp-primary-hover: var(--color-primary-hover);
+    --cp-danger: var(--color-error);
+}
+
+/* --- LAYOUT CONTAINER (MOBILE FIRST) --- */
+.create-post-container {
+    width: 100vw;
+    height: 100vh;
+    background-color: var(--cp-bg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+}
+
+/* --- HEADER (MOBILE) --- */
+.create-header {
+    width: 100%;
+    height: 50px;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px;
+    background-color: var(--cp-surface);
+    border-bottom: 1px solid var(--cp-border);
+    z-index: 100;
+}
+
+.create-header h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--cp-text-main);
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    color: var(--cp-text-main);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Mobile Share Button */
+.mobile-only-share {
+    background: none;
+    color: var(--cp-primary);
+    border: none;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+.desktop-header-spacer {
+    display: none;
+    /* Hidden on mobile */
+}
+
+
+/* --- BODY CONTENT (MOBILE) --- */
+.create-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    /* Scroll entire body on mobile */
+    overflow-x: hidden;
+    width: 100%;
+}
+
+/* 1. MEDIA SECTION (MOBILE) */
+.media-preview-section {
+    width: 100%;
+    /* On mobile, standard flow. No fixed height, let it stack or defined min-height */
+    min-height: 350px;
+    background-color: var(--cp-surface);
+    /* Changed from #000 to match theme */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid var(--cp-border);
+    position: relative;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    color: var(--cp-text-main);
+}
+
+.primary-select-btn {
+    background-color: var(--cp-primary);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* Preview Stack (Vertical) */
+.preview-grid {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.preview-item {
+    width: 100%;
+    position: relative;
+    background: var(--cp-surface);
+    /* Changed from #111 */
+}
+
+.preview-item img,
+.preview-item video {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 80vh;
+    /* Don't be too tall on mobile */
+    object-fit: contain;
+    /* Changed from cover to see full image */
+    background: var(--cp-bg);
+}
+
+.remove-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+
+/* 2. CONTENT SECTION (MOBILE) */
+.content-section {
+    width: 100%;
+    background-color: var(--cp-surface);
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    /* Takes remaining space if needed */
+}
+
+.user-mini-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+}
+
+.user-avatar-small {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+    background-color: var(--cp-border);
+}
+
+.user-avatar-small img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.user-username {
+    color: var(--cp-text-main);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.caption-input {
+    width: 100%;
+    min-height: 120px;
+    background: transparent;
+    border: none;
+    color: var(--cp-text-main);
+    font-size: 1rem;
+    padding: 0 16px;
+    resize: none;
+    outline: none;
+    font-family: inherit;
+    line-height: 1.5;
+}
+
+.caption-tools {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 16px;
+    color: var(--cp-text-muted);
+}
+
+.emoji-trigger-btn {
+    background: none;
+    border: none;
+    color: var(--cp-text-muted);
+    cursor: pointer;
+    padding: 4px;
+}
+
+/* Metadata List */
+.metadata-tools {
+    border-top: 1px solid var(--cp-border);
+    margin-top: 8px;
+}
+
+.tool-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid var(--cp-border);
+    color: var(--cp-text-main);
+    cursor: pointer;
+}
+
+.tool-item span {
+    font-size: 1rem;
+}
+
+.tool-icon,
+.chevron {
+    color: var(--cp-text-muted);
+}
+
+/* Bottom Actions */
+.bottom-action-area {
+    padding: 16px;
+    background-color: var(--cp-surface);
+}
+
+/* Hide Large Share on Mobile since we have header button */
+.share-btn-large {
+    display: none;
+}
+
+
+
+/* --- Custom Reel Video Player --- */
+.custom-video-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    /* Default fill */
+    background-color: #000;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    /* CRITICAL for cropping/zoom results */
+    border-radius: 4px;
+}
+
+/* When aspect ratio is active, ensure it doesn't overflow container if possible */
+.custom-video-wrapper[style*="aspect-ratio"] {
+    max-height: 80vh;
+    /* Cap height on mobile */
+    height: auto;
+}
+
+/* Specific selector to override .preview-item video defaults */
+.preview-item .reel-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* Cover is essential for crop behavior */
+    display: block;
+    max-height: none;
+    /* Reset limitation */
+    background: transparent;
+    transition: transform 0.1s ease-out;
+}
+
+.video-overlay-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    pointer-events: none;
+}
+
+.play-circle {
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.video-mute-btn {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+    transition: background-color 0.2s;
+}
+
+.video-mute-btn:hover {
+    background-color: rgba(0, 0, 0, 0.8);
+}
+
+/* --- DESKTOP OVERRIDES (min-width: 850px) --- */
+@media (min-width: 850px) {
+
+    /* 1. Modal Container */
+    .create-post-container {
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(0, 0, 0, 0.85);
+        /* Dimmed Backdrop */
+    }
+
+    /* 2. Header (Grid Layout) */
+    .create-header {
+        width: 70vw;
+        /* Match Body Width */
+        max-width: 1400px;
+        /* Max cap */
+        border-radius: 12px 12px 0 0;
+        border: 1px solid var(--cp-border);
+        border-bottom: 1px solid var(--cp-border);
+
+        display: grid;
+        grid-template-columns: 48px 1fr 48px;
+        /* Left | Center | Right */
+        padding: 0 16px;
+    }
+
+    .create-header h2 {
+        justify-self: center;
+        /* Explicit center */
+    }
+
+    .mobile-only-share {
+        display: none;
+        /* Hide text button */
+    }
+
+    .desktop-header-spacer {
+        display: block;
+        /* Show spacer for balance */
+    }
+
+    /* 3. Layout Body (Split) */
+    .create-body {
+        flex-direction: row;
+        /* Side-by-side */
+        width: 70vw;
+        max-width: 1400px;
+        height: 80vh;
+        /* Fixed height for modal */
+        background-color: var(--cp-bg);
+        border: 1px solid var(--cp-border);
+        border-top: none;
+        border-radius: 0 0 12px 12px;
+        overflow: hidden;
+        /* Main container clips overflow */
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Left: Media */
+    .media-preview-section {
+        width: 60%;
+        /* Split ratio */
+        height: 100%;
+        border-bottom: none;
+        border-right: 1px solid var(--cp-border);
+        align-items: center;
+        overflow: hidden;
+        /* Important */
+    }
+
+    .preview-grid {
+        height: 100%;
+        overflow-y: auto;
+        /* Scroll INSIIDE media area */
+        display: flex;
+        flex-direction: column;
+    }
+
+    .preview-item {
+        min-height: 100%;
+        /* Force fill height */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--cp-surface);
+        /* Changed from #000 */
+    }
+
+    .preview-item img,
+    .preview-item video {
+        height: 100%;
+        width: 100%;
+        object-fit: cover;
+        max-height: none;
+    }
+
+    /* Hover Overlays (Desktop Only) */
+    .media-overlays {
+        position: absolute;
+        bottom: 16px;
+        left: 16px;
+        display: flex;
+        gap: 8px;
+        opacity: 0;
+        transition: opacity 0.2s;
+        z-index: 20;
+    }
+
+    .preview-item:hover .media-overlays {
+        opacity: 1;
+    }
+
+    .overlay-btn {
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        backdrop-filter: blur(4px);
+    }
+
+    /* Right: Content */
+    .content-section {
+        width: 40%;
+        height: 100%;
+        position: relative;
+    }
+
+    .content-scroll-area {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .caption-input {
+        flex: 1;
+        /* Expand to take space */
+    }
+
+    /* Desktop Bottom Actions */
+    .bottom-action-area {
+        margin-top: auto;
+    }
+
+    .share-btn-large {
+        display: block;
+        /* Show on Desktop */
+        width: 100%;
+        background-color: var(--cp-primary);
+        color: white;
+        border: none;
+        padding: 12px;
+        border-radius: 8px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: filter 0.2s;
+    }
+
+    .share-btn-large:hover {
+        filter: brightness(1.1);
+    }
+
+    .share-btn-large:disabled {
+        background-color: var(--cp-border);
+        cursor: not-allowed;
+    }
+}

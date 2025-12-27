@@ -12,7 +12,10 @@ app.use(cors());
 app.use(express.json());
 
 const authRoutes = require('./routes/auth.routes');
+const postsRoutes = require('./routes/posts.routes');
+
 app.use('/api/auth', authRoutes);
+app.use('/api/posts', postsRoutes);
 
 app.get('/', (req, res) => {
   res.send('Hello from Chatterbox Server! server is running');

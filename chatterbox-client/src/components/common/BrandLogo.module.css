@@ -1,0 +1,103 @@
+/* BrandLogo.module.css */
+
+.brandLogo {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 0;
+    flex-wrap: nowrap;
+
+    /* Default size, can be overridden */
+    font-size: 4rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.5px;
+    /* Wider spacing per user request */
+    margin: 0;
+    font-family: 'Outfit', sans-serif;
+    color: var(--color-text-main);
+
+    white-space: nowrap;
+    width: auto;
+    user-select: none;
+}
+
+.brandText {
+    display: block;
+    flex-shrink: 0;
+}
+
+.brandHighlight {
+    background: linear-gradient(135deg, var(--color-primary) 0%, #ec4899 50%, var(--color-accent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    position: relative;
+    display: block;
+    flex-shrink: 0;
+}
+
+/* Underline effect */
+.underline {
+    position: absolute;
+    bottom: 5px;
+    left: 0;
+    width: 0%;
+    height: 8px;
+    /* Thinner line */
+    background: var(--color-primary);
+    opacity: 0.2;
+    z-index: -1;
+    transform: skewX(-10deg);
+    border-radius: 2px;
+}
+
+/* --- Animations --- */
+
+/* Slide In */
+.animateSlide {
+    opacity: 0;
+    animation: slideInFromLeft 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+/* Pop In */
+.animatePop {
+    opacity: 0;
+    animation: popIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s forwards;
+}
+
+/* Expand */
+.animateExpand {
+    animation: expandWidth 0.6s ease-out 0.8s forwards;
+}
+
+@keyframes slideInFromLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes popIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes expandWidth {
+    to {
+        width: 100%;
+    }
+}

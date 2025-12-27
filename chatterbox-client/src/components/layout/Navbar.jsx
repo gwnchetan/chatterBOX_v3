@@ -1,12 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import './Navbar.css';
 import Avatar from '../common/Avatar';
-import { Home, Grid, Bookmark, Send, BarChart, Settings, LogOut, User } from '../common/Icons';
+import BrandLogo from '../common/BrandLogo';
+import { Home, Grid, Bookmark, Send, BarChart, Settings, LogOut, User, Plus } from '../common/Icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const Navbar = () => {
     const navigate = useNavigate();
     const location = useLocation();
+
+    // Auto-collapse on tablet (<= 1100px)
+    const [isCollapsed, setIsCollapsed] = useState(window.innerWidth <= 1100);
+
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth <= 1100) {
+                setIsCollapsed(true);
+            } else {
+                setIsCollapsed(false);
+            }
+        };
+
+        // Check on mount
+        handleResize();
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Determine active link based on current path
     const getActiveLink = (path) => {
@@ -17,6 +37,7 @@ const Navbar = () => {
         if (path === '/stats') return 'Stats';
         if (path === '/settings') return 'Settings';
         if (path === '/profile') return 'Profile';
+        if (path === '/create') return 'Create';
         return 'Feed'; // Default
     };
 
@@ -24,6 +45,7 @@ const Navbar = () => {
 
     const navItems = [
         { id: 'Feed', icon: <Home />, label: 'Feed', path: '/feed' },
+        { id: 'Create', icon: <Plus />, label: 'Create', path: '/create' },
         { id: 'Explore', icon: <Grid />, label: 'Explore', path: '/explore' },
         { id: 'Favorites', icon: <Bookmark />, label: 'My Favorites', path: '/favorites' },
         { id: 'Direct', icon: <Send />, label: 'Direct', path: '/direct' },
@@ -36,10 +58,8 @@ const Navbar = () => {
     };
 
     const handleLogout = () => {
-        // Clear auth data
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        // Redirect to login
         navigate('/');
     };
 
@@ -47,13 +67,17 @@ const Navbar = () => {
     const user = JSON.parse(localStorage.getItem('user')) || { fullname: 'Cyndy Lillibridge', username: 'cyndyui' };
 
     return (
-        <nav className="navbar">
+        <nav className={`navbar ${isCollapsed ? 'collapsed' : ''}`}>
+
             {/* Logo Section */}
-            <div className="logo-container">
-                <h1 className="brand-logo">
-                    <span className="brand-text">chatter</span>
-                    <span className="brand-highlight">BOX</span>
-                </h1>
+            <div className="logo-container" onClick={() => handleNavigation('/feed')}>
+                {isCollapsed ? (
+                    <div className="brand-icon-only">
+                        <span>C</span>
+                    </div>
+                ) : (
+                    <BrandLogo size="2rem" animated={true} />
+                )}
             </div>
 
             {/* Navigation Menu */}
@@ -64,7 +88,7 @@ const Navbar = () => {
                 >
                     <div className="nav-link">
                         <span className="nav-icon"><User /></span>
-                        <span className="nav-text">Profile</span>
+                        {!isCollapsed && <span className="nav-text">Profile</span>}
                     </div>
                 </li>
 
@@ -76,7 +100,7 @@ const Navbar = () => {
                     >
                         <div className="nav-link">
                             <span className="nav-icon">{item.icon}</span>
-                            <span className="nav-text">{item.label}</span>
+                            {!isCollapsed && <span className="nav-text">{item.label}</span>}
                         </div>
                     </li>
                 ))}
@@ -86,17 +110,19 @@ const Navbar = () => {
             <div className="navbar-footer">
                 <div className="user-profile" onClick={() => handleNavigation('/profile')}>
                     <div className="nav-icon avatar-icon">
-                        <Avatar size="sm" alt={user.fullname} />
+                        <Avatar src={user.avatar} size={isCollapsed ? "sm" : "md"} alt={user.fullname} />
                     </div>
-                    <div className="user-info">
-                        <span className="user-name">{user.fullname}</span>
-                        <span className="user-handle">@{user.username || 'user'}</span>
-                    </div>
+                    {!isCollapsed && (
+                        <div className="user-info">
+                            <span className="user-name">{user.fullname}</span>
+                            <span className="user-handle">@{user.username || 'user'}</span>
+                        </div>
+                    )}
                 </div>
 
                 <div className="logout-btn" onClick={handleLogout}>
                     <LogOut />
-                    <span>Logout</span>
+                    {!isCollapsed && <span>Logout</span>}
                 </div>
             </div>
         </nav>

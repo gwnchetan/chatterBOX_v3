@@ -1,246 +1,412 @@
-/* Feed Page Layout */
+/* Feed Page Layout - Responsive Centered Grid */
 .feed-layout {
-    display: flex;
+    display: grid;
+    /* Grid columns: Left Sidebar (20vw) | Main Feed (45vw) | Right Sidebar (20vw) */
+    grid-template-columns: 20vw 45vw 20vw;
+    justify-content: center;
+    gap: 20px;
+    /* Clean balanced gap */
     min-height: 100vh;
     background-color: var(--color-bg);
-    /* Dark background */
     color: var(--color-text-main);
+    width: 100%;
+    max-width: 100vw;
+    /* Allow full spread */
+    margin: 0;
+    position: relative;
+    padding-top: 10px;
+    /* Breathing room top */
 }
 
-/* 3-Column Layout */
-/* 3-Column Layout */
-.sidebar-left {
-    width: 340px;
-    /* Increased from 280px */
-    height: 100vh;
-    position: fixed;
-    top: 0;
-    left: 0;
-    padding: var(--spacing-xl) 0;
+/* 1. LEFT SIDEBAR (Sticky) */
+.feed-layout .navbar {
+    grid-column: 1;
+    /* Width is handled by Navbar.css (20vw) */
+    width: auto !important;
+    height: calc(100vh - 20px);
+    /* Height minus gap */
+    position: sticky !important;
+    top: 10px;
+    left: auto !important;
+    border-radius: 20px;
+    /* Modern cleaner look */
     display: flex;
     flex-direction: column;
-    background-color: var(--color-bg);
-    border-right: 1px solid var(--color-border);
-    z-index: 10;
+    /* Remove border, use surface color for distinctness */
+    border-right: none;
+    background-color: var(--color-surface);
+    z-index: 50;
+    overflow-y: visible;
+    /* Allow toggle button to be seen if outside */
+    overflow-x: visible;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    padding: 1rem;
 }
 
-/* Main Content (Center) */
+.feed-layout .navbar::-webkit-scrollbar {
+    display: none;
+}
+
+/* 2. MAIN FEED (Center) */
 .feed-center {
-    flex: 1;
-    margin-left: 340px;
-    margin-right: 27%;
-    /* Space for 27% width sidebar */
-    min-width: 0;
-    padding: 0;
+    grid-column: 2;
+    width: 100%;
+    /* Ensure it fills its grid cell but respects minmax */
     display: flex;
     flex-direction: column;
+    border: none;
+    /* Cleaner look */
+    min-width: 0;
+    /* Critical for grid overlap prevention */
+    gap: 20px;
+    padding: 0 20px;
+    /* Add internal padding since we are full width */
 }
 
 .feed-center-content {
     width: 100%;
-    max-width: 680px;
-    /* Constrained width for narrow feed */
-    margin: 0 auto;
-    /* Center in the available space */
-    padding: var(--spacing-xl) 0;
-    /* Vertical padding only */
-    min-height: 100vh;
+    padding: 0 0 100px 0;
     display: flex;
     flex-direction: column;
 }
 
-/* 1. Feed Header Unified */
-.feed-header-unified {
+/* 3. RIGHT SIDEBAR (Sticky) */
+.sidebar-right {
+    grid-column: 3;
+    width: 20vw;
+    /* Match Navbar */
+    height: calc(100vh - 20px);
+    position: sticky;
+    top: 10px;
+    right: auto;
+    padding: 16px;
+    background-color: var(--color-bg);
+    /* Or surface if preferred, standard is BG for right panel to recede */
+    border-left: none;
+    overflow-y: auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    z-index: 40;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    /* Align baselines effectively or center */
-    padding-bottom: var(--spacing-lg);
-    margin-top: var(--spacing-md);
-    margin-bottom: var(--spacing-xl);
-    /* No border as per reference, or very subtle if needed */
+    flex-direction: column;
 }
 
-.feed-header-unified h1 {
-    font-size: 2rem;
-    font-weight: 800;
-    letter-spacing: -0.5px;
-    color: var(--color-text-main);
-    line-height: 1;
+.sidebar-right::-webkit-scrollbar {
+    display: none;
 }
 
-.header-filters {
+/* --- CREATE POST DOCK (Fixed & Centered) --- */
+/* To center strictly on the screen (which matches the centered feed), we use fixed positioning */
+.create-post-wrapper {
+    position: fixed;
+    bottom: 24px;
+    left: 0;
+    right: 0;
+    /* Center in viewport, but we can align to grid if preferred. 
+       Viewport center is safer for UX. */
     display: flex;
-    gap: var(--spacing-lg);
+    justify-content: center;
+    z-index: 100;
+    pointer-events: none;
 }
 
-.text-filter {
-    background: none;
+.create-post-dock {
+    width: 600px;
+    /* Comfortable width */
+    max-width: 92%;
+    /* Mobile safety */
+    pointer-events: auto;
+
+    background: rgba(30, 30, 35, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 12px 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Fix Dock Input styling specifically */
+.dock-input {
+    width: 100%;
+    color: white !important;
+    background: transparent !important;
+    font-size: 1rem;
     border: none;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--color-text-muted);
-    /* Muted by default */
-    cursor: pointer;
-    padding: 0;
-    transition: color 0.2s;
-    opacity: 0.6;
-    /* More muted like reference */
+    outline: none;
 }
 
-.text-filter:hover {
-    color: var(--color-text-main);
-    opacity: 1;
+.dock-input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
 }
 
-.text-filter.active {
-    color: var(--color-text-main);
-    opacity: 1;
+/* --- POST IMAGE SLIDER (Instagram-like) --- */
+.post-slider-wrapper {
+    position: relative;
+    width: 100%;
+    /* Use aspect-ratio to adapt closer to typical mobile photos (4:5) */
+    /* aspect-ratio: 4/5; REMOVED to allow dynamic sizing */
+    aspect-ratio: auto;
+    /* Remove fixed height to allow ratio to dictate size */
+    /* height: 500px; */
+    max-height: 75vh;
+    background-color: #000;
 }
 
-/* 3. Post List */
-/* 3. Post List */
-.feed-list {
+.post-slider-track {
     display: flex;
-    flex-direction: column;
-    /* Vertical list */
-    gap: 4rem;
-    /* Increased spacing */
-    padding-bottom: 160px;
-    /* Space for fixed dock */
+    width: 100%;
+    height: 100%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
-/* Post Card Dark Theme - Editorial */
-.post-card-dark {
-    background-color: var(--color-surface);
+.post-slider-track::-webkit-scrollbar {
+    display: none;
+}
+
+.slider-item {
+    flex: 0 0 100%;
+    height: 100%;
+    scroll-snap-align: center;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+}
+
+.slider-item img {
+    max-width: 100%;
+    width: 100%;
+    height: 100%;
+    /* Prevent cropping */
+    object-fit: contain;
+    display: block;
+}
+
+.slider-dots {
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.slider-dot {
+    width: 6px;
+    height: 6px;
+    background-color: rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.slider-dot.active {
+    background-color: #fff;
+    transform: scale(1.2);
+}
+
+.slider-counter {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    font-size: 0.75rem;
+    padding: 4px 10px;
     border-radius: 12px;
-    padding: 0;
-    border: 1px solid var(--color-border);
-    overflow: hidden;
-    transition: border-color 0.2s;
+    font-weight: 600;
+    z-index: 10;
 }
 
-.post-card-dark:hover {
-    border-color: rgba(255, 255, 255, 0.1);
+/* Navigation Arrows */
+.slider-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+    color: #000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s;
+    opacity: 0;
+    /* Hidden by default */
 }
 
+.post-slider-wrapper:hover .slider-arrow {
+    opacity: 1;
+    /* Show on hover */
+}
+
+.slider-arrow:hover {
+    background-color: #fff;
+    transform: translateY(-50%) scale(1.1);
+}
+
+.slider-arrow-left {
+    left: 10px;
+}
+
+.slider-arrow-right {
+    right: 10px;
+}
+
+/* Header polishing */
 .post-header {
+    padding: 16px 20px 12px;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    padding: var(--spacing-lg) var(--spacing-lg) 0;
 }
 
 .post-meta {
     display: flex;
-    gap: var(--spacing-md);
+    gap: 12px;
     align-items: center;
+}
+
+/* Enforce avatar constraints just in case */
+.post-meta .avatar-container {
+    flex-shrink: 0;
 }
 
 .meta-text {
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    gap: 2px;
 }
 
 .meta-top {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .meta-top h4 {
+    margin: 0;
     font-size: 0.95rem;
     font-weight: 700;
     color: var(--color-text-main);
 }
 
 .meta-dot {
-    font-size: 0.8rem;
     color: var(--color-text-muted);
+    font-size: 0.8rem;
 }
 
 .meta-time {
-    font-size: 0.85rem;
     color: var(--color-text-muted);
+    font-size: 0.85rem;
 }
 
 .meta-handle {
     font-size: 0.85rem;
     color: var(--color-text-muted);
-    line-height: 1;
 }
 
 .post-options {
-    color: var(--color-text-muted);
     background: transparent;
     border: none;
+    color: var(--color-text-muted);
     cursor: pointer;
-    padding: 4px;
+    padding: 8px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
 }
 
-.post-content-text {
-    padding: var(--spacing-md) var(--spacing-lg);
-    font-size: 1rem;
-    line-height: 1.6;
+.post-options:hover {
+    background-color: var(--color-bg);
     color: var(--color-text-main);
 }
 
-/* --- CALM HOVER GRID LOGIC --- */
+/* Content Text */
+.post-content-text {
+    padding: 0 20px 12px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--color-text-main);
+}
+
+/* THE GRID OF IMAGES */
 .post-hover-grid {
     display: flex;
     width: 100%;
-    margin-top: var(--spacing-sm);
-    overflow: hidden;
-    height: 300px;
-    /* Reduced base height for calm feel */
-    gap: 4px;
-    padding: 0 0;
-    /* Full bleed images inside card */
+    height: 350px;
+    /* Fixed height for consistency */
+    gap: 2px;
+    /* Tiny gap for crisp look */
+    background-color: #000;
 }
 
+/* Individual Image Container */
 .hover-image-item {
     flex: 1;
+    /* Distribute evenly */
     position: relative;
     overflow: hidden;
-    transition: flex 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-    background-color: #1a1a1a;
-    cursor: default;
-    /* No pointer if no click action */
+    height: 100%;
+    min-width: 0;
+    /* Allow shrinking below content size */
+    transition: flex 0.4s ease;
 }
 
+/* Actual Image */
 .hover-image-item img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    /* Crop to fill, never squash */
     display: block;
-    transition: transform 0.5s ease;
+    transition: transform 0.6s ease;
 }
 
-/* Hover behaviors */
+/* Hover Interaction: Expand one, shrink others */
 .post-hover-grid:hover .hover-image-item {
-    flex: 0.6;
-    filter: brightness(0.7);
+    flex: 0.5;
+    /* Shrink unfocused */
+    filter: brightness(0.6);
+    /* Dim others */
 }
 
 .post-hover-grid .hover-image-item:hover {
-    flex: 2.5;
-    /* Gentle expansion */
+    flex: 3;
+    /* Grow focused significantly */
     filter: brightness(1);
+    /* Highlight */
 }
 
 .post-hover-grid .hover-image-item:hover img {
-    transform: scale(1.02);
+    transform: scale(1.05);
+    /* Zoom effect */
 }
 
-/* Tweaks for count */
+/* Single Image Case */
 .hover-grid-one {
-    height: 350px;
-    /* Calm single preview height, not cinematic */
+    height: auto;
+    /* Let it scale naturally */
+    max-height: 600px;
     display: block;
-    /* Normal block for single */
 }
 
 .hover-grid-one .hover-image-item {
@@ -248,275 +414,198 @@
     height: 100%;
 }
 
-/* Disable flexible resizing for single item since there's nothing to squeeze */
-.hover-grid-one:hover .hover-image-item {
-    filter: brightness(1);
-}
-
-/* Actions Bar - Fixed alignment */
+/* Stats/Actions Bar */
 .post-actions-bar {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    /* Crucial for vertical center */
-    padding: 12px 24px;
-    /* Balanced padding */
-    border-top: 1px solid var(--color-border);
-    margin-top: 4px;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
 }
 
 .action-item {
-    background: none;
-    border: none;
     display: flex;
     align-items: center;
-    gap: 8px;
-    /* More space between icon and text */
+    gap: 6px;
+    background: transparent;
+    border: none;
     color: var(--color-text-muted);
     cursor: pointer;
     font-size: 0.9rem;
     font-weight: 500;
-    transition: all 0.2s;
-    padding: 4px 8px;
-    border-radius: 6px;
+    transition: color 0.2s;
+    padding: 0;
 }
 
 .action-item:hover {
-    background-color: rgba(255, 255, 255, 0.03);
     color: var(--color-text-main);
 }
 
 .icon-container {
     display: flex;
+    gap: 6px;
     align-items: center;
-    justify-content: center;
-    color: inherit;
-}
-
-.icon-container svg {
-    width: 18px;
-    /* Consistent icon size */
-    height: 18px;
-    stroke-width: 2px;
+    font-size: 1.2rem;
 }
 
 .icon-container.liked {
     color: #ef4444;
+    /* Heart Red */
 }
 
-.icon-container.liked svg {
+.heart-filled {
     fill: #ef4444;
-    stroke: none;
 }
 
-/* 4. Create Post Dock (Floating Bottom) */
-/* 4. Create Post Dock (Floating Bottom) */
-/* 4. Create Post Dock (Floating Bottom) */
-/* 4. Create Post Dock (Floating Bottom) */
-.create-post-dock {
-    position: fixed;
-    bottom: var(--spacing-lg);
-    /* Center calculation: Navbar (340px) + half of available space (100vw - 340px - 27vw Sidebar) */
-    /* Visual Center = 340px + (73vw - 340px)/2 = 340px + 36.5vw - 170px = 170px + 36.5vw */
-    left: calc(36.5vw + 170px);
-    transform: translateX(-50%);
-    width: 600px;
-    max-width: 90vw;
-    margin: 0;
-
-    /* Glassmorphism Polish */
-    background-color: rgba(30, 41, 59, 0.85);
-    /* Semi-transparent */
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    /* Subtle glass border */
-
-    border-radius: 20px;
-    padding: var(--spacing-md) var(--spacing-lg);
-    z-index: 100;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-/* Override Avatar size specifically inside dock */
-.dock-top .avatar {
-    width: 36px !important;
-    height: 36px !important;
-    font-size: 0.85rem !important;
-}
-
-/* Dock Top: Avatar + Input + Smile */
-.dock-top {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-}
-
-.dock-top .avatar {
-    border-radius: 50%;
-    overflow: hidden;
-    flex-shrink: 0;
-}
-
-.dock-top .avatar img {
-    border-radius: 50%;
-}
-
-.dock-input {
-    flex: 1;
-    background: transparent;
+/* Slider Overrides (from earlier logic) */
+.slider-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    background-color: rgba(255, 255, 255, 0.9);
     border: none;
-    font-size: 1rem;
-    color: var(--color-text-main);
-    padding: 8px 0;
-    outline: none;
-    min-width: 0;
-}
-
-.dock-input::placeholder {
-    color: var(--color-text-muted);
-    font-weight: 400;
-    opacity: 0.7;
-}
-
-.dock-icon-btn {
-    background: transparent !important;
-    border: none !important;
-    outline: none !important;
-    color: var(--color-text-muted);
-    cursor: pointer;
-    padding: 6px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s;
-}
-
-.dock-icon-btn:hover {
-    color: var(--color-text-main);
-    background-color: rgba(255, 255, 255, 0.05) !important;
-}
-
-/* Dock Bottom: Actions + Send */
-.dock-bottom {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
-
-.dock-actions {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.dock-action-item {
-    background: transparent !important;
-    border: none !important;
-    outline: none !important;
-    color: var(--color-text-muted);
-    font-weight: 500;
-    font-size: 0.85rem;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 99px;
+    z-index: 20;
+    color: #000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     transition: all 0.2s;
-    white-space: nowrap;
+    opacity: 0;
+    /* Hidden by default */
 }
 
-.dock-action-item svg {
-    stroke-width: 2px;
+.post-slider-wrapper:hover .slider-arrow {
+    opacity: 1;
+    /* Show on hover */
 }
 
-.dock-action-item:hover {
-    color: var(--color-text-main);
-    background-color: rgba(255, 255, 255, 0.05) !important;
+.slider-arrow:hover {
+    background-color: #fff;
+    transform: translateY(-50%) scale(1.1);
 }
 
-.dock-send-btn {
-    background-color: var(--color-text-main) !important;
-    /* Force black/white contrast */
-    color: var(--color-bg) !important;
-    border: none !important;
-    outline: none !important;
-    padding: 6px 20px;
-    border-radius: 99px;
-    font-weight: 600;
-    font-size: 0.9rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.2s, opacity 0.2s;
-    white-space: nowrap;
+.slider-arrow-left {
+    left: 12px;
 }
 
-.dock-send-btn:hover {
-    transform: scale(1.02);
-    opacity: 0.9;
+.slider-arrow-right {
+    right: 12px;
 }
 
-/* Mobile Adjustment */
-@media (max-width: 1024px) {
-    .create-post-dock {
-        width: auto;
-        /* Reset fixed width */
-        max-width: none;
-        left: 0;
-        right: 0;
-        transform: none;
-        /* Reset center transform */
-        margin: 0 var(--spacing-md);
-        bottom: 80px;
-        border-radius: 16px;
-    }
-}
+/* --- RESPONSIVENESS --- */
 
-/* Right Sidebar (Sticky) */
-.sidebar-right {
-    width: 460px;
-    height: 100vh;
-    position: fixed;
-    top: 0;
-    right: 0;
-    padding: var(--spacing-xl);
-    background-color: var(--color-bg);
-    border-left: 1px solid var(--color-border);
-    overflow: hidden;
-    /* No scrollbar */
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-}
-
-/* Mobile */
-@media (max-width: 1024px) {
+/* 1. Large Laptop (Hide Right Sidebar, Center Feed) */
+@media (max-width: 1400px) {
     .feed-layout {
-        flex-direction: column;
+        /* Drop 3rd column */
+        /* Navbar (23vw) | Feed (Grow) */
+        /* Actually, keep sidebar functionality correct */
+        /* grid-template-columns: 280px minmax(0, 1fr) 0px? */
+        /* Let's follow requirement: Feed covers screen */
+
+        /* New request: on Tablet (which overlaps usually < 1100), expand feed */
+        /* But here in standard laptop: */
+        grid-template-columns: 20vw 1fr;
+        max-width: 1200px;
     }
 
-    .sidebar-left,
     .sidebar-right {
+        display: none;
+    }
+}
+
+/* 2. Tablet (Collapse Navbar, Expand Feed) */
+@media (max-width: 1100px) {
+    .feed-layout {
+        /* Navbar is collapsed to ~88px */
+        /* Feed takes the rest */
+        grid-template-columns: 88px 1fr;
+        gap: 0;
+        /* Remove gap for cleaner look on tablet */
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .feed-layout .navbar {
+        width: auto !important;
+        /* Responds to collapsed class */
+        /* Remove padding/margin adjustments if handled by component */
+        align-items: center;
+        padding: 1.5rem 0.5rem;
+        background-color: var(--color-surface);
+    }
+
+    .feed-center {
+        /* Ensure feed fills its allocated 1fr */
+        /* Add some padding to not touch edges */
+        padding: 0 10px;
+    }
+
+    /* Ensure text labels are hidden if CSS controlled here, 
+       but Navbar.jsx handles conditional rendering, so we mostly trust that.
+       However, safety first: */
+}
+
+/* 3. Mobile (Stack everything) */
+@media (max-width: 700px) {
+    .feed-layout {
+        display: block;
+        /* Stack */
+    }
+
+    .feed-layout .navbar {
         display: none;
     }
 
     .feed-center {
-        margin: 0;
-        width: 100%;
+        padding: 0;
     }
+}
 
-    .feed-center-content {
-        padding: var(--spacing-md);
-    }
+.dock-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dock-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.dock-action-item {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 99px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dock-send-btn {
+    background: #fff;
+    color: #000;
+    border: none;
+    padding: 6px 20px;
+    border-radius: 99px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.dock-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 /* Sidebar Item (Ported minimal styles for Sidebar.jsx to work) */
@@ -565,6 +654,93 @@
     padding: 1px 6px;
     border-radius: 99px;
     font-weight: 700;
+}
+
+/* --- Feed Header & Filters --- */
+/* Feed Header & Filters */
+.feed-header-unified {
+    position: relative;
+    top: auto;
+    z-index: 10;
+    background-color: var(--color-bg);
+    /* removed hardcoded dark blur */
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 0;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.feed-header-unified h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+    /* Remove gradient text for now to ensure visibility in light mode or use variable gradient if defined */
+    background: none;
+    -webkit-text-fill-color: var(--color-text-main);
+    letter-spacing: -0.5px;
+    margin: 0;
+}
+
+.header-filters {
+    display: flex;
+    gap: 20px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 6px 8px;
+    border-radius: 99px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.text-filter {
+    background: none;
+    border: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 6px 16px;
+    border-radius: 99px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0.8;
+}
+
+.text-filter:hover {
+    color: var(--color-text-main);
+    background: rgba(255, 255, 255, 0.05);
+    opacity: 1;
+}
+
+.text-filter.active {
+    color: #fff;
+    background: var(--color-primary);
+    box-shadow: 0 4px 12px var(--color-primary-alpha);
+    opacity: 1;
+}
+
+/* Feed List Container */
+.feed-list {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    width: 100%;
+}
+
+/* Ensure the card itself is strictly contained */
+/* Ensure the card itself is strictly contained */
+.post-card {
+    width: 100%;
+    max-width: 100%;
+    background-color: var(--color-surface) !important;
+    border-radius: 24px;
+    border: 1px solid var(--color-border);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    margin-bottom: 24px;
 }
 
 /* --- STORIES SECTION (REFINED MINIMAL) --- */
@@ -833,58 +1009,39 @@
     font-weight: 500;
 }
 
-/* --- RIGHT SIDEBAR: REQUESTS & CONTACTS (NEW) --- */
+/* --- RIGHT SIDEBAR: CONTENT STYLING --- */
 
-/* Headers with Badges */
-/* --- RIGHT SIDEBAR: CARDS & LISTS (FINAL) --- */
-
-/* --- RIGHT SIDEBAR: 3 PARTITIONS (27% WIDTH) --- */
-
-.sidebar-right {
-    width: 27%;
-    position: fixed;
-    top: 0;
-    right: 0;
-    height: 100vh;
-    border-left: 1px solid var(--color-border);
-    background-color: var(--color-bg);
-    padding: 0;
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-}
-
-.rs-partition {
-    flex: 1;
-    /* Takes 1/3 of the height each */
-    border-bottom: 1px solid var(--color-border);
-    display: flex;
-    flex-direction: column;
-    padding: 16px;
-    overflow: hidden;
-}
-
-.rs-partition:last-child {
-    border-bottom: none;
-}
-
-/* Partition 1: Stories */
+/* Partition Titles */
 .partition-title {
     font-size: 1.1rem;
     font-weight: 800;
     color: var(--color-text-main);
     margin-bottom: 16px;
+    margin-top: 0;
 }
 
+/* Base Partition Container */
+.rs-partition {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 24px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.rs-partition:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+/* Partition 1: Stories */
 .stories-scroll-container {
     display: flex;
     overflow-x: auto;
     gap: 12px;
     padding-bottom: 8px;
-    /* For scrollbar space if any */
-    height: 100%;
-    align-items: center;
-    /* Vertically center the cards in the available space */
+    height: auto;
+    align-items: flex-start;
     scrollbar-width: thin;
     scrollbar-color: var(--color-border) transparent;
 }
@@ -907,9 +1064,9 @@
     flex-shrink: 0;
     cursor: pointer;
     transition: transform 0.2s;
-    background-color: var(--color-surface);
+    background-color: var(--color-bg);
     overflow: hidden;
-    /* Dark gradient overlay at bottom for readability */
+    border: none;
 }
 
 /* Gradient Overlay via Pseudo-element */
@@ -933,7 +1090,6 @@
 
 .story-card:hover {
     transform: translateY(-2px);
-    /* Slight lift */
 }
 
 /* 1. Avatar Floating Top Center */
@@ -943,11 +1099,9 @@
     left: 50%;
     transform: translateX(-50%);
     z-index: 2;
-    border: 3px solid #3b82f6;
-    /* Blue ring like reference */
+    border: 3px solid var(--color-primary);
     border-radius: 50%;
     padding: 1px;
-    /* Gap between ring and avatar */
     background-color: transparent;
     display: flex;
     align-items: center;
@@ -963,7 +1117,6 @@
     border-radius: 50%;
     overflow: hidden;
     border: 2px solid var(--color-bg);
-    /* Inner border to separate from ring */
 }
 
 /* 2. Name Floating Bottom Center */
@@ -986,38 +1139,10 @@
 
 /* --- Add Story Card Specifics --- */
 .add-story-card {
-    background-color: #f1f5f9;
-    /* Light grey/blueish like reference */
+    background-color: var(--color-bg);
     border: none;
-}
-
-.story-bg-placeholder {
-    width: 100%;
-    height: 60%;
-    /* Top part empty-ish */
-    background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.05));
-}
-
-.add-story-btn {
-    position: absolute;
-    bottom: 40px;
-    /* Above text */
-    left: 50%;
-    transform: translateX(-50%);
-    width: 32px;
-    height: 32px;
-    background-color: #3b82f6;
-    /* Primary Blue */
-    border-radius: 8px;
-    /* Squircle Add Button icon */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 1.2rem;
-    font-weight: 700;
-    border: 3px solid white;
-    z-index: 2;
+    border: 1px dashed var(--color-border);
+    /* Dashed border for add card */
 }
 
 /* Remove gradient for add story card */
@@ -1025,10 +1150,30 @@
     display: none;
 }
 
-/* Ensure text matches logic */
-.add-story-card .story-username-overlay {
-    bottom: 14px;
+.story-bg-placeholder {
+    width: 100%;
+    height: 60%;
+    background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.05));
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
+
+.add-story-btn {
+    width: 32px;
+    height: 32px;
+    background-color: var(--color-primary);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.2rem;
+    font-weight: 700;
+    z-index: 2;
+    margin-bottom: 20px;
+}
+
 
 /* --- Partition 2: Requests --- */
 .partition-header {
@@ -1041,7 +1186,6 @@
 }
 
 .right-title {
-    /* Re-using or redefining specific title for requests */
     color: var(--color-text-muted);
     font-size: 0.8rem;
     font-weight: 700;
@@ -1050,7 +1194,7 @@
 }
 
 .badge-count {
-    background-color: #3b82f6;
+    background-color: var(--color-primary);
     color: white;
     font-size: 0.7rem;
     font-weight: 700;
@@ -1060,7 +1204,7 @@
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    box-shadow: 0 2px 5px rgba(59, 130, 246, 0.3);
+    box-shadow: 0 2px 5px var(--color-primary-alpha);
 }
 
 .requests-list {
@@ -1068,78 +1212,53 @@
     flex-direction: column;
     gap: 16px;
     width: 100%;
-    overflow-y: auto;
     padding: 2px;
-    /* Prevent shadow cutout */
-    flex: 1;
-    /* Take remaining height */
-    min-height: 0;
-    /* Allow scrolling within flex item */
-    scrollbar-width: thin;
-}
-
-.requests-list::-webkit-scrollbar {
-    width: 6px;
-}
-
-.requests-list::-webkit-scrollbar-thumb {
-    background-color: var(--color-border);
-    border-radius: 4px;
 }
 
 .request-card {
-    background-color: var(--color-surface);
+    background-color: var(--color-bg);
     border-radius: 16px;
     padding: 12px;
     display: flex;
     flex-direction: column;
     gap: 10px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.03);
+    border: none;
     transition: transform 0.2s, background-color 0.2s;
 }
 
 .request-card:hover {
-    background-color: var(--color-surface-hover, #2d3342);
-    /* Fallback hue */
+    background-color: var(--color-surface);
     transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    /* Soft shadow requested */
 }
 
 .req-top {
     display: flex;
-    gap: 10px;
-    align-items: flex-start;
+    gap: 12px;
+    align-items: center;
 }
 
 .req-text {
     display: flex;
     flex-direction: column;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
+    /* Slightly larger */
     line-height: 1.3;
-    padding-top: 2px;
 }
 
-/* Force specific small rounded avatar for requests to match reference */
 .req-top .avatar,
 .req-top .avatar img {
-    width: 32px !important;
-    height: 32px !important;
+    width: 32px;
+    height: 32px;
     min-width: 32px;
-    border-radius: 50% !important;
-    /* User asked for "rounded", usually means circle in this context, but if they want squircle let's wait. Let's do circle as it's safer "rounded" interpretation, or sticking to reference which was squircle? The user said "make it rounded" implying it WASN'T. If I used Avatar xs, it should have been circle. Maybe it wasn't? 
-    Let's go with 50% (Circle) as it's the most common request. If they want squircle they usually say "square" or "rounded corners". */
-    /* Wait, let's look at the previous turn. I set it to 'xs'. User says "make it rounded and make it small". 
-       Maybe 'xs' is square in my design system? I don't see the Avatar CSS. 
-       Let's stick to the visual reference which was Squircle/Rounded-Square. 
-       Actually, I'll go with 50% (Circle) because "rounded" often means "make it round" (circle). 
-       BUT, I will make it SMALL (32px). 
-       
-       Update: Use 50% for now. */
-    border-radius: 50% !important;
+    border-radius: 50%;
 }
 
 .req-name {
     font-weight: 700;
+    /* Bold */
     color: var(--color-text-main);
 }
 
@@ -1151,42 +1270,117 @@
 .req-actions {
     display: flex;
     gap: 8px;
-    width: 100%;
+    margin-left: auto;
+    /* Push to right */
 }
 
-.btn-req-accept,
-.btn-req-decline {
-    flex: 1;
-    padding: 6px 0;
-    border-radius: 10px;
-    font-weight: 600;
-    font-size: 0.8rem;
+/* Icon Buttons for Requests */
+.btn-req-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
     cursor: pointer;
     transition: all 0.2s;
+}
+
+.btn-accept {
+    background-color: var(--color-primary);
+    color: white;
+}
+
+.btn-accept:hover {
+    filter: brightness(1.1);
+    transform: scale(1.05);
+}
+
+.btn-decline {
+    background-color: var(--color-bg);
+    /* Light gray/bg */
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+}
+
+.btn-decline:hover {
+    background-color: var(--color-border);
+    color: var(--color-text-main);
+}
+
+
+.hashtag {
+    color: #1d9bf0;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+/* --- Custom Reel Video Player --- */
+.custom-video-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    /* CRITICAL for cropping */
+    border-radius: 12px;
+}
+
+.reel-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* Cover for reels feel */
+    display: block;
+    transition: transform 0.1s ease-out;
+    /* Smooth transform */
+}
+
+.video-overlay-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    pointer-events: none;
+}
+
+.play-circle {
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.video-mute-btn {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
     border: none;
     display: flex;
     align-items: center;
     justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+    transition: background-color 0.2s;
 }
 
-.btn-req-accept {
-    background-color: #3b82f6;
-    color: white;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
-}
-
-.btn-req-accept:hover {
-    background-color: #2563eb;
-    transform: translateY(-1px);
-}
-
-.btn-req-decline {
-    background-color: transparent;
-    border: 1px solid var(--color-border);
-    color: var(--color-text-main);
-}
-
-.btn-req-decline:hover {
-    background-color: rgba(255, 255, 255, 0.05);
-    border-color: var(--color-text-muted);
+.video-mute-btn:hover {
+    background-color: rgba(0, 0, 0, 0.8);
 }

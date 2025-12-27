@@ -44,103 +44,33 @@
 }
 
 /* Brand Styles */
-/* Brand Styles */
 .brand-header {
     margin-bottom: 3rem;
-    /* Removed animation from container to animate children individually */
-}
-
-.brand-logo {
-    font-size: 3.5rem;
-    font-weight: 900;
-    letter-spacing: -2px;
-    color: var(--color-text-main);
-    line-height: 1;
-    margin: 0;
-    font-family: 'Outfit', sans-serif;
-    display: flex;
-    align-items: center;
-    gap: 0.2rem;
-    overflow: hidden;
-    /* prevents scrollbar during slide-in if needed, though usually on container */
-}
-
-.brand-text {
-    display: inline-block;
-    animation: slideInFromLeft 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-    opacity: 0;
-    transform: translateX(-50px);
-}
-
-.brand-highlight {
-    background: linear-gradient(135deg, var(--color-primary) 0%, #ec4899 50%, var(--color-accent) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    position: relative;
-    display: inline-block;
-    opacity: 0;
-    transform: scale(0.5) rotate(-10deg);
-    animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.4s forwards;
-    /* 0.4s delay */
-}
-
-/* Add a cool underline/box effect to 'BOX' */
-.brand-highlight::after {
-    content: '';
-    position: absolute;
-    bottom: 5px;
-    left: 0;
-    width: 0%;
-    /* Start width 0 */
-    height: 8px;
-    background: var(--color-primary);
-    opacity: 0.2;
-    z-index: -1;
-    border-radius: 2px;
-    transform: skewX(-10deg);
-    animation: expandWidth 0.4s ease-out 1s forwards;
-    /* 1s delay */
 }
 
 .brand-tagline {
     font-size: 1.1rem;
+    /* Proportional to 4rem header */
     color: var(--color-text-muted);
-    font-weight: 500;
+    font-weight: 600;
+    /* Slightly bolder */
     margin-top: 0.5rem;
+    /* Closer to header */
     letter-spacing: 0.5px;
     opacity: 0;
-    animation: fadeIn 0.8s ease-out 1.2s forwards;
-    /* 1.2s delay */
+    animation: fadeInTagline 0.8s ease-out 1s forwards;
 }
 
-@keyframes slideInFromLeft {
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-@keyframes popIn {
-    to {
-        opacity: 1;
-        transform: scale(1) rotate(0deg);
-    }
-}
-
-@keyframes expandWidth {
-    to {
-        width: 100%;
-    }
-}
-
-@keyframes fadeIn {
+@keyframes fadeInTagline {
     to {
         opacity: 1;
     }
 }
+
 
 .login-title {
-    font-size: var(--text-4xl);
+    font-size: 2.5rem;
+    /* Matches reference */
     font-weight: 800;
     color: var(--color-text-main);
     margin-bottom: var(--spacing-2xl);

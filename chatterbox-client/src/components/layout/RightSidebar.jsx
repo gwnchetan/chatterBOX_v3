@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import Avatar from '../common/Avatar';
+import { Check, X } from '../common/Icons';
 
 const RightSidebar = () => {
     const scrollContainerRef = useRef(null);
@@ -84,8 +85,12 @@ const RightSidebar = () => {
                                 </div>
                             </div>
                             <div className="req-actions">
-                                <button className="btn-req-accept">Accept</button>
-                                <button className="btn-req-decline">Decline</button>
+                                <button className="btn-req-icon btn-accept" title="Accept">
+                                    <Check size={18} />
+                                </button>
+                                <button className="btn-req-icon btn-decline" title="Decline">
+                                    <X size={18} />
+                                </button>
                             </div>
                         </div>
                     ))}

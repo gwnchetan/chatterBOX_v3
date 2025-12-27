@@ -169,4 +169,107 @@ const googleLogin = async (req, res) => {
     }
 };
 
-module.exports = { registerUser, loginUser, googleLogin };
+const facebookLogin = async (req, res) => {
+    try {
+        const { accessToken, userID } = req.body;
+
+        // 1. Strict Input Validation
+        if (!accessToken || !userID) {
+            return res.status(400).json({ message: "Invalid Facebook credentials" });
+        }
+
+        // 2. Verify Token with Facebook Graph API
+        // CRITICAL: We fetch the ID from Facebook to ensure the token actually belongs to the claimed userID
+        const facebookResponse = await axios.get(`https://graph.facebook.com/me`, {
+            params: {
+                access_token: accessToken,
+                fields: 'id,name,email,picture'
+            }
+        });
+
+        const { id: graphId, name, email, picture } = facebookResponse.data;
+
+        // 3. Security Check: Token Owner Mismatch
+        if (graphId !== userID) {
+            return res.status(401).json({ message: "Identity verification failed" });
+        }
+
+        // 4. Find or Create User (Safe Account Linking)
+
+        // Step A: Search by facebookId
+        let user = await User.findOne({ facebookId: graphId });
+
+        if (user) {
+            // User found via Facebook ID - Login proceed
+        } else {
+            // Step B: Search by Email (if exists)
+            if (email) {
+                user = await User.findOne({ email });
+
+                if (user) {
+                    // User exists by email. Check if they already have a DIFFERENT facebookId linked?
+                    // Since facebookId is unique and sparse, if user.facebookId was set, we would have found them in Step A.
+                    // BUT, we should check if they have a facebookId just in case of race/logic weirdness, 
+                    // though theoretically user.facebookId should be undefined here if Step A failed.
+
+                    if (user.facebookId) {
+                        // This technically shouldn't happen if Step A failed, but good for sanity.
+                        // It implies the email matches but the ID doesn't? That would mean two FB accounts with same email?
+                        // Or database inconsistency. We'll play safe.
+                        return res.status(409).json({ message: "Account conflict detected" });
+                    }
+
+                    // Strict Linking: Only link if we are sure.
+                    user.facebookId = graphId;
+                    await user.save();
+                }
+            }
+
+            // Step C: Create New User if still not found
+            if (!user) {
+                // Generate random password for safety
+                const randomPassword = await bcrypt.hash(Math.random().toString(36).slice(-8) + Date.now(), 10);
+
+                // Handle username collisions
+                let username = email ? email.split('@')[0] : `user_${graphId}`;
+                let checkUsername = await User.findOne({ username });
+                if (checkUsername) {
+                    username += Math.floor(1000 + Math.random() * 9000);
+                }
+
+                user = new User({
+                    username,
+                    fullname: name,
+                    email: email || "", // Email might be missing from FB if permission denied or by phone
+                    password: randomPassword,
+                    facebookId: graphId
+                });
+                await user.save();
+            }
+        }
+
+        // 5. Generate Internal JWT
+        const token = jwt.sign(
+            { id: user._id, username: user.username },
+            process.env.JWT_SECRET || "default_secret_key",
+            { expiresIn: "1d" }
+        );
+
+        res.status(200).json({
+            message: "Facebook login successful",
+            token,
+            user: {
+                id: user._id,
+                username: user.username,
+                fullname: user.fullname,
+                email: user.email
+            }
+        });
+
+    } catch (error) {
+        console.error("Facebook login error:", error.response?.data || error.message);
+        res.status(500).json({ message: "Facebook authentication failed" });
+    }
+};
+
+module.exports = { registerUser, loginUser, googleLogin, facebookLogin };

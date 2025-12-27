@@ -4,348 +4,180 @@
     top: 0;
     left: 0;
     height: 100vh;
-    width: 340px;
-    /* Reference width */
+    width: 20vw;
+    /* 20% of viewport width */
     background-color: var(--color-surface);
-    /* Sidebar Background */
     display: flex;
     flex-direction: column;
-    padding: 1rem 0 2rem 1rem;
-    /* Left padding creates the "rail" feel, Right side is where action happens */
+    padding: 1.5rem 1rem;
     z-index: 1000;
-    transition: width 0.3s ease;
-    overflow: hidden;
-    box-shadow: 1px 0 0 rgba(255, 255, 255, 0.05);
-    /* Subtle separate */
+    transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+    border-right: 1px solid var(--color-border);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.05);
+    /* Soft Shadow */
 }
 
+.navbar.collapsed {
+    width: 88px;
+    /* Compact Width */
+    padding: 1.5rem 0.75rem;
+    align-items: center;
+}
+
+/* --- TOGGLE BUTTON REMOVED --- */
+
+/* --- LOGO --- */
 .logo-container {
-    padding: 2rem 1rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 2rem;
-    color: var(--color-text-main);
-    cursor: pointer;
-    /* Enable clicking */
-}
-
-/* Brand Logo Styles */
-.brand-logo {
-    font-size: 2.4rem;
-    /* Increased size */
-    font-weight: 900;
-    letter-spacing: -1.5px;
-    color: var(--color-text-main);
-    line-height: 1;
-    margin: 0;
-    font-family: 'Outfit', sans-serif;
-    display: flex;
-    align-items: center;
-    gap: 0.1rem;
-}
-
-.brand-text {
-    display: inline-block;
-    opacity: 1;
-    /* Ensure visible by default so it doesn't vanish when animation swapping happens */
-    animation: slideInFromLeft 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-}
-
-.brand-highlight {
-    background: linear-gradient(135deg, var(--color-primary) 0%, #ec4899 50%, var(--color-accent) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    position: relative;
-    display: inline-block;
-    opacity: 1;
-    /* Ensure visible */
-    /* Transformation moved to @keyframes to prevent revert flicker */
-    animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.2s forwards;
-}
-
-.brand-highlight::after {
-    content: '';
-    position: absolute;
-    bottom: 2px;
-    left: 0;
-    width: 0%;
-    height: 4px;
-    background: var(--color-primary);
-    opacity: 0.2;
-    z-index: -1;
-    border-radius: 2px;
-    transform: skewX(-10deg);
-    animation: expandWidth 0.4s ease-out 0.8s forwards;
-}
-
-/* Hover Animations - Mimic Entrance */
-.logo-container:hover .brand-text {
-    animation: slideReplay 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-}
-
-.logo-container:hover .brand-highlight {
-    animation: popReplay 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-}
-
-@keyframes slideReplay {
-    0% {
-        transform: translateX(0);
-        opacity: 1;
-    }
-
-    30% {
-        transform: translateX(-10px);
-        opacity: 1;
-    }
-
-    100% {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
-@keyframes popReplay {
-    0% {
-        transform: scale(1) rotate(0deg);
-        opacity: 1;
-    }
-
-    40% {
-        transform: scale(1.1) rotate(-10deg);
-        opacity: 1;
-    }
-
-    100% {
-        transform: scale(1) rotate(0deg);
-        opacity: 1;
-    }
-}
-
-@keyframes slideInFromLeft {
-    0% {
-        opacity: 0;
-        transform: translateX(-20px);
-    }
-
-    100% {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-@keyframes popIn {
-    0% {
-        opacity: 0;
-        transform: scale(0.5) rotate(-10deg);
-    }
-
-    100% {
-        opacity: 1;
-        transform: scale(1) rotate(0deg);
-    }
-}
-
-@keyframes expandWidth {
-    to {
-        width: 100%;
-    }
-}
-
-.nav-menu {
-    list-style: none;
-    width: 100%;
-    padding-left: 0.5rem;
-    /* Indent slightly */
-}
-
-.nav-item {
-    position: relative;
-    width: 100%;
-    margin-bottom: 0.5rem;
-    border-top-left-radius: 30px;
-    border-bottom-left-radius: 30px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.nav-link {
-    position: relative;
-    display: flex;
-    align-items: center;
-    width: 100%;
     height: 60px;
-    /* Fixed height for calculations */
-    text-decoration: none;
-    color: var(--color-text-muted);
-    padding-left: 1.5rem;
-    z-index: 2;
-    /* Content above background */
-    gap: 1rem;
+    display: flex;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-left: 0.5rem;
+    cursor: pointer;
 }
 
-.nav-icon {
-    font-size: 1.5rem;
-    min-width: 30px;
-    text-align: center;
-    transition: transform 0.3s ease;
+.navbar.collapsed .logo-container {
+    justify-content: center;
+    padding-left: 0;
+}
+
+.brand-icon-only {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: white;
+    font-weight: 800;
+    font-size: 1.5rem;
 }
 
-.nav-text {
-    font-size: 1rem;
-    font-weight: 500;
+
+
+/* --- NAV ITEMS --- */
+.nav-menu {
+    list-style: none;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.nav-item {
+    width: 100%;
+    cursor: pointer;
+}
+
+/* Link Container */
+.nav-link {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-radius: 16px;
+    /* Pill Shape */
+    color: var(--color-text-muted);
+    transition: all 0.2s ease;
+    height: 50px;
     white-space: nowrap;
+    overflow: hidden;
 }
 
-/* Hover State (Non-Active) */
+.navbar.collapsed .nav-link {
+    justify-content: center;
+    padding: 12px;
+    width: 50px;
+    /* Square/Circle pill */
+    margin: 0 auto;
+}
+
+/* Icons */
+.nav-icon {
+    font-size: 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    transition: transform 0.2s;
+}
+
+/* Text */
+.nav-text {
+    margin-left: 16px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    opacity: 1;
+    transition: opacity 0.2s;
+}
+
+/* Hover State */
 .nav-item:not(.active):hover .nav-link {
-    color: var(--color-primary);
+    background-color: var(--color-bg);
+    color: var(--color-text-main);
 }
 
 .nav-item:not(.active):hover .nav-icon {
-    transform: translateX(3px);
+    transform: translateX(2px);
 }
 
-
-/* --- THE LIQUID ACTIVE STATE --- */
-
-/* 1. The connector (The hole) */
-.nav-item.active {
-    background-color: var(--color-bg);
-    /* Matches page background! */
-    /* This creates the "hole" visual because the sidebar is --color-surface */
-    /* Wait, if sidebar is on top, this needs different logic. */
-    /* Logic: The nav-item itself becomes Transparent (or Page BG) and we use pseudo elements to reconstruct the curves of the Sidebar (Surface) around it? */
-    /* Actually common method: The Nav Item IS transparent/PageBG. The Sidebar has the color. */
-    /* But to curve INWARDS, we need the sidebar to be the "solid" and the active item to be the "void". */
-    border-top-left-radius: 30px;
-    border-bottom-left-radius: 30px;
+.navbar.collapsed .nav-item:not(.active):hover .nav-icon {
+    transform: none;
+    /* No movement in collapsed */
+    transform: scale(1.1);
 }
 
-/* 
-   Re-thinking the Liquid Logic for easy CSS:
-   Sidebar Background: Surface.
-   Active Item Background: Page BG (Dark/Light).
-   Problem: Sidebar is rectangular.
-   Solution:
-   The Active Item gets `background-color: var(--color-bg)`.
-   And it has rounded corners on the LEFT side (border-top-left-radius: 30px; border-bottom-left-radius: 30px;).
-   BUT we need the "gooey" curves on the outside corners (Top-Right of the 'hole' and Bottom-Right of the 'hole').
-   
-   Actually, the standard "Apple Sidebar" liquid effect:
-   The Sidebar is White.
-   The Active Link has a White background? No, usually Active Link is contrast.
-   
-   Looking at user image 1 (Top Left):
-   Sidebar = White.
-   Profile (Active) = Black Background with Orange Circle.
-   The White Sidebar curves *into* the Black Profile button.
-   
-   So:
-   Sidebar = Surface.
-   Active Item = Page BG (or specific active color).
-   
-   Correction:
-   The user wants the "sidebar" to look like it flows.
-   Let's simply make the active item have a background that matches the `body` background (`var(--color-bg)`).
-   And then use box-shadows on the *siblings* or pseudo elements of the active item to create the inverse curve.
-*/
-
+/* --- ACTIVE STATE (The colored pill from image) --- */
 .nav-item.active .nav-link {
-    color: var(--color-text-main);
-    /* Active text color */
-}
-
-/* The Bubble Icon Background */
-.nav-item.active .nav-icon {
     background-color: var(--color-primary);
-    /* The colored circle */
+    /* Purple/Blue pill */
     color: white;
-    /* Icon inside is white */
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    transform: translateX(-5px);
-    /* Move slightly left to center in curve if needed */
-    box-shadow: 0 4px 10px var(--color-primary-alpha);
-    z-index: 10;
+    box-shadow: 0 4px 12px var(--color-primary-alpha);
+    font-weight: 600;
 }
 
-
-/* The Curves */
-/* Top Curve */
-.nav-item.active::before {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: -50px;
-    /* Height of curve area */
-    width: 50px;
-    height: 50px;
-    background-color: transparent;
-    border-radius: 50%;
-    box-shadow: 35px 35px 0 10px var(--color-bg);
-    /* The color of the active item/page */
-    pointer-events: none;
-    z-index: 1;
+.nav-item.active .nav-icon {
+    color: white;
 }
 
-/* Bottom Curve */
-.nav-item.active::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    bottom: -50px;
-    width: 50px;
-    height: 50px;
-    background-color: transparent;
-    border-radius: 50%;
-    box-shadow: 35px -35px 0 10px var(--color-bg);
-    pointer-events: none;
-    z-index: 1;
-}
-
-/* Fix for light mode/dark mode box shadow color matching */
-/* The box shadow color MUST match the background color of the active item (which matches the feed) */
-
-
-/* User Section at Bottom */
+/* --- FOOTER / USER --- */
 .navbar-footer {
     margin-top: auto;
-    /* Push to bottom */
-    padding: 0 1.5rem;
     width: 100%;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .user-profile {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    padding: 1rem 0;
-    border-top: 1px solid rgba(148, 163, 184, 0.2);
-    margin-bottom: 0.5rem;
+    padding: 10px;
+    border-radius: 16px;
     cursor: pointer;
-    transition: opacity 0.2s;
+    transition: background-color 0.2s;
 }
 
 .user-profile:hover {
-    opacity: 0.8;
+    background-color: var(--color-bg);
+}
+
+.navbar.collapsed .user-profile {
+    justify-content: center;
+    padding: 10px 0;
 }
 
 .user-info {
     display: flex;
     flex-direction: column;
+    margin-left: 12px;
     overflow: hidden;
 }
 
 .user-name {
     font-size: 0.9rem;
-    font-weight: 700;
-    color: var(--color-text-main);
-    white-space: nowrap;
 }
 
 .user-handle {
@@ -356,17 +188,27 @@
 .logout-btn {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    color: var(--color-error);
-    padding: 1rem 0;
+    padding: 12px 16px;
+    color: #ef4444;
+    /* Standard Error Red */
     cursor: pointer;
     font-weight: 600;
     font-size: 0.9rem;
-    transition: transform 0.2s;
+    border-radius: 16px;
+    transition: background-color 0.2s;
+}
+
+.navbar.collapsed .logout-btn {
+    justify-content: center;
+    padding: 12px;
 }
 
 .logout-btn:hover {
-    transform: translateX(5px);
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+.logout-btn span {
+    margin-left: 12px;
 }
 
 /* Avatar positioning tweak */

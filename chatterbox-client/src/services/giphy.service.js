@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const GIPHY_API_KEY = 's8W9lPEzlSDcpBJoAsUQGFHB5XOCJMol'; // Hardcoded as requested
+const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY;
 const BASE_URL = 'https://api.giphy.com/v1/gifs';
 
 // Strict limits

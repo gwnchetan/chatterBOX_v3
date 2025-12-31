@@ -1,83 +1,16 @@
 import React, { useState, useRef } from 'react';
 import Avatar from '../common/Avatar';
-import { MoreHorizontal, Heart, MessageSquare, Share2, Repeat, ChevronLeft, ChevronRight, Trash, Play, Pause, Volume2, VolumeX } from '../common/Icons';
+import { MoreHorizontal, Heart, MessageSquare, Share2, Repeat, ChevronLeft, ChevronRight, Trash } from '../common/Icons';
 import { postsService } from '../../services/posts.service';
 import { useToast } from '../Toast';
+import ConfirmModal from '../common/ConfirmModal';
+import VideoPlayer from './VideoPlayer';
 
-import ConfirmModal from '../common/ConfirmModal'; // [NEW]
 
-const VideoPlayer = ({ src, metadata }) => {
-    const videoRef = useRef(null);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [isMuted, setIsMuted] = useState(true);
-
-    const { zoom, rotation, aspect, crop, percentCrop } = metadata || {};
-
-    let objectPosition = 'center';
-    if (percentCrop) {
-        const x = percentCrop.x + percentCrop.width / 2;
-        const y = percentCrop.y + percentCrop.height / 2;
-        objectPosition = `${x}% ${y}%`;
-    }
-
-    const togglePlay = (e) => {
-        e.stopPropagation();
-        if (videoRef.current) {
-            if (isPlaying) {
-                videoRef.current.pause();
-                setIsPlaying(false);
-            } else {
-                videoRef.current.play();
-                setIsPlaying(true);
-            }
-        }
-    };
-
-    const toggleMute = (e) => {
-        e.stopPropagation();
-        setIsMuted(!isMuted);
-    };
-
-    const videoStyle = {
-        transform: `scale(${zoom || 1}) rotate(${rotation || 0}deg)`,
-        transformOrigin: 'center',
-        objectPosition
-    };
-
-    const wrapperStyle = aspect ? { aspectRatio: `${aspect}` } : undefined;
-
-    return (
-        <div className="custom-video-wrapper" onClick={togglePlay} style={wrapperStyle}>
-            <video
-                ref={videoRef}
-                src={src}
-                className="reel-video"
-                loop
-                playsInline
-                muted={isMuted}
-                style={videoStyle}
-            />
-
-            {/* Play/Pause Overlay */}
-            {!isPlaying && (
-                <div className="video-overlay-center">
-                    <div className="play-circle">
-                        <Play fill="white" size={24} />
-                    </div>
-                </div>
-            )}
-
-            {/* Mute Control */}
-            <button className="video-mute-btn" onClick={toggleMute}>
-                {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-            </button>
-        </div>
-    );
-};
 
 const PostCard = ({ post, onDelete }) => {
     const [liked, setLiked] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false); // [NEW]
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const user = JSON.parse(localStorage.getItem('user'));
     const isAuthor = user && (post.author?._id === user._id || post.author?._id === user.id || post.author === user.id);
 
@@ -104,12 +37,10 @@ const PostCard = ({ post, onDelete }) => {
         }
     };
 
-    // Trigger Modal
     const handleDeleteClick = () => {
         setShowDeleteModal(true);
     };
 
-    // Actual Delete Logic
     const confirmDelete = async () => {
         try {
             await postsService.deletePost(post._id);
@@ -124,41 +55,43 @@ const PostCard = ({ post, onDelete }) => {
     };
 
     const renderMedia = () => {
-        if (!post.media || post.media.length === 0) return null;
+        // Updated Logic: Check for Video first (Exclusive)
+        const video = post.media?.find(m => m.type === 'video');
+        if (video) {
+            return <VideoPlayer media={video} />;
+        }
 
-        // Use aspect ratio from first media item if available (Video mainly), else default to 4/5
-        const firstMeta = post.media[0]?.metadata;
-        // Default to 4/5 (0.8) if no aspect specified, or 'auto' if prefered? 
-        // Instagram defaults to 4:5 or 1:1. 4/5 is safer for consistency.
-        const containerAspect = firstMeta?.aspect ? `${firstMeta.aspect}` : '0.8';
+        const media = post.media?.filter(m => m.type !== 'video') || [];
+        if (media.length === 0) return null;
+
+        const firstItem = media[0];
+        // Priority: Top-level aspectRatio (New Schema) -> Metadata aspect (Legacy) -> Default 0.8
+        const containerAspect = firstItem.aspectRatio || firstItem.metadata?.aspect || 0.8;
 
         return (
-            <div className="post-slider-wrapper" style={{ aspectRatio: containerAspect }}>
+            <div className="post-slider-wrapper" style={{ aspectRatio: `${containerAspect}` }}>
                 <div
                     className="post-slider-track"
                     onScroll={handleScroll}
                     ref={sliderRef}
                 >
-                    {post.media.map((item, idx) => (
-                        <div key={idx} className="slider-item">
-                            {item.type === 'video' ? (
-                                <VideoPlayer src={item.url} metadata={item.metadata} />
-                            ) : (
+                    {media.map((item, idx) => {
+                        return (
+                            <div key={idx} className="slider-item">
                                 <img src={item.url} alt="" loading="lazy" />
-                            )}
-                        </div>
-                    ))}
+                            </div>
+                        );
+                    })}
                 </div>
 
-                {/* Navigation Arrows */}
-                {post.media.length > 1 && (
+                {media.length > 1 && (
                     <>
                         {currentSlide > 0 && (
                             <button className="slider-arrow slider-arrow-left" onClick={(e) => { e.stopPropagation(); scrollPrev(); }}>
                                 <ChevronLeft />
                             </button>
                         )}
-                        {currentSlide < post.media.length - 1 && (
+                        {currentSlide < media.length - 1 && (
                             <button className="slider-arrow slider-arrow-right" onClick={(e) => { e.stopPropagation(); scrollNext(); }}>
                                 <ChevronRight />
                             </button>
@@ -166,10 +99,9 @@ const PostCard = ({ post, onDelete }) => {
                     </>
                 )}
 
-                {/* Dots indicator */}
-                {post.media.length > 1 && (
+                {media.length > 1 && (
                     <div className="slider-dots">
-                        {post.media.map((_, idx) => (
+                        {media.map((_, idx) => (
                             <span
                                 key={idx}
                                 className={`slider-dot ${currentSlide === idx ? 'active' : ''}`}
@@ -246,7 +178,6 @@ const PostCard = ({ post, onDelete }) => {
                 </button>
             </div>
 
-            {/* Confirmation Modal */}
             <ConfirmModal
                 isOpen={showDeleteModal}
                 title="Delete Post?"

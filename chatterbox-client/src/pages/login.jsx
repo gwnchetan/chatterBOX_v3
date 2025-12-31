@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './login.css';
 import { useToast } from '../components/Toast';
 import BrandLogo from '../components/common/BrandLogo';
+import LogoLoader from '../components/common/LogoLoader';
 import { useGoogleLogin } from '@react-oauth/google';
 import loginIllustration from '../assets/login.png';
 import { useNavigate } from 'react-router-dom';
@@ -103,6 +104,7 @@ function Login() {
 
     const googleLogin = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
+            console.log("Google Popup Success, Token:", tokenResponse);
             try {
                 setIsLoading(true);
                 const res = await fetch('http://localhost:5000/api/auth/google', {
@@ -122,16 +124,22 @@ function Login() {
                 success("Google Login Successful!");
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('user', JSON.stringify(data.user));
+                console.log("Navigating to feed...");
+                // Force navigation if react-router is stuck
                 navigate('/feed');
+                // Backup: window.location.href = '/feed';
 
             } catch (err) {
-                console.error("Google Auth Error:", err);
-                error(err.message);
+                console.error("Google Auth Backend Error:", err);
+                error(err.message || "Google Login Failed on Server");
             } finally {
                 setIsLoading(false);
             }
         },
-        onError: error => console.log('Login Failed:', error)
+        onError: errorResponse => {
+            console.error('Google Popup Failed:', errorResponse);
+            error("Google Popup Closed or Failed");
+        }
     });
 
 
@@ -363,8 +371,8 @@ function Login() {
                                 </div>
                             )}
 
-                            <button type="submit" className="login-button" disabled={isLoading}>
-                                {isLoading ? "Processing..." : (isRegister ? "Sign Up" : "Login")}
+                            <button type="submit" className="login-button" disabled={isLoading} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                {isLoading ? <div style={{ transform: 'scale(0.5)' }}><LogoLoader size="2rem" text="" /></div> : (isRegister ? "Sign Up" : "Login")}
                             </button>
                         </form>
 

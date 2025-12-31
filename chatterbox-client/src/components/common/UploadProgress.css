@@ -1,0 +1,182 @@
+/* Upload Progress Bar (Shared Desktop/Mobile) */
+.upload-status-bar {
+    position: fixed;
+    /* Mobile: Above standard bottom nav height (usually 60px) + spacing */
+    bottom: 80px;
+    left: 16px;
+    right: 16px;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    z-index: 9000;
+    animation: slideUp 0.3s ease-out;
+    border-left: 4px solid var(--color-primary);
+}
+
+.upload-status-bar.success {
+    border-left-color: var(--color-success);
+}
+
+.upload-status-bar.error {
+    border-left-color: var(--color-error);
+}
+
+/* Thumbnail */
+.status-thumb {
+    width: 40px;
+    height: 40px;
+    position: relative;
+    border-radius: 4px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: #000;
+}
+
+.status-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.status-icon-badge {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Spinner */
+.spinner-tiny {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid var(--color-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Content */
+.status-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    justify-content: center;
+}
+
+.status-text-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+}
+
+.status-pct {
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.status-progress-track {
+    width: 100%;
+    height: 4px;
+    background: var(--color-bg);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.status-progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    transition: width 0.3s ease;
+}
+
+/* Error Msg */
+.status-error-msg {
+    font-size: 0.75rem;
+    color: var(--color-error);
+}
+
+/* Actions */
+.status-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.action-retry,
+.action-close {
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-retry:hover {
+    color: var(--color-primary);
+    background: var(--color-bg);
+}
+
+.action-close:hover {
+    color: var(--color-error);
+    background: var(--color-bg);
+}
+
+/* ANIMATIONS */
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes slideUpCenter {
+    from {
+        transform: translate(-50%, 20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
+}
+
+/* DESKTOP OVERRIDES */
+@media (min-width: 850px) {
+    .upload-status-bar {
+        left: 50%;
+        right: auto;
+        /* Center horizontally */
+        bottom: 32px;
+        width: 360px;
+        animation: slideUpCenter 0.3s ease-out forwards;
+        /* Use centered animation */
+    }
+}

@@ -77,6 +77,29 @@
     /* Hidden on mobile */
 }
 
+/* Common Header Button Styles */
+.publish-btn {
+    background-color: var(--cp-primary);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: filter 0.2s;
+}
+
+.publish-btn:hover {
+    filter: brightness(1.1);
+}
+
+.publish-btn:disabled {
+    background-color: var(--cp-border);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
 
 /* --- BODY CONTENT (MOBILE) --- */
 .create-body {
@@ -163,6 +186,28 @@
     align-items: center;
     justify-content: center;
     z-index: 10;
+}
+
+.edit-btn-float {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    z-index: 10;
+    transition: all 0.2s;
+}
+
+.edit-btn-float:hover {
+    background: rgba(0, 0, 0, 0.8);
+    transform: scale(1.05);
 }
 
 
@@ -422,6 +467,11 @@
         /* Important */
     }
 
+    .media-preview-section.full-width {
+        width: 100%;
+        border-right: none;
+    }
+
     .preview-grid {
         height: 100%;
         overflow-y: auto;
@@ -521,4 +571,157 @@
         background-color: var(--cp-border);
         cursor: not-allowed;
     }
+}
+
+/* --- VIDEO EDIT CONTROLS --- */
+.video-edit-controls {
+    padding: 16px;
+    background-color: var(--cp-surface);
+    border-top: 1px solid var(--cp-border);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.control-label-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    color: var(--cp-text-muted);
+}
+
+.control-actions-row {
+    display: flex;
+    gap: 12px;
+}
+
+.icon-action-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background-color: var(--cp-bg);
+    border: 1px solid var(--cp-border);
+    padding: 10px;
+    border-radius: 8px;
+    color: var(--cp-text-main);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.icon-action-btn:hover {
+    background-color: var(--cp-border);
+}
+
+.aspect-ratio-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+}
+
+.aspect-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background-color: var(--cp-bg);
+    border: 1px solid var(--cp-border);
+    padding: 8px 4px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--cp-text-muted);
+    font-size: 0.75rem;
+    transition: all 0.2s;
+}
+
+.aspect-btn:hover {
+    border-color: var(--cp-text-muted);
+}
+
+.aspect-btn.active {
+    background-color: var(--cp-primary);
+    color: white;
+    border-color: var(--cp-primary);
+}
+
+/* --- EDITOR MODE CONTAINER --- */
+.editor-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.video-edit-workflow {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.editor-preview-area {
+    flex: 1;
+    position: relative;
+    background-color: #000;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Progress Bar Styles */
+.progress-bar-container {
+    width: 60%;
+    height: 8px;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    margin-top: 12px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: var(--cp-primary);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.publishing-status-text {
+    margin-top: 8px;
+    font-size: 0.9rem;
+    color: var(--cp-text-muted);
+}
+
+/* --- PUBLISHING OVERLAY --- */
+.publishing-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: var(--cp-bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 20000;
+    /* Above everything */
+}
+
+.publishing-overlay h3 {
+    color: var(--cp-text-main);
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 8px;
 }

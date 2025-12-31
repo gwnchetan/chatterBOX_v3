@@ -149,13 +149,24 @@
 .post-slider-wrapper {
     position: relative;
     width: 100%;
-    /* Use aspect-ratio to adapt closer to typical mobile photos (4:5) */
-    /* aspect-ratio: 4/5; REMOVED to allow dynamic sizing */
+    /* Aspect ratio controlled via inline style from metadata */
     aspect-ratio: auto;
-    /* Remove fixed height to allow ratio to dictate size */
-    /* height: 500px; */
-    max-height: 75vh;
+    min-height: 320px;
+    max-height: 600px;
+    /* Reduced from 85vh for shorter cards */
     background-color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.reel-video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    /* Critical: Video pads itself inside container */
+    display: block;
 }
 
 .post-slider-track {

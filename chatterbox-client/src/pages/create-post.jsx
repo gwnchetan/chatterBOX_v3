@@ -2,98 +2,41 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import EmojiPicker from 'emoji-picker-react';
 import { useToast } from '../components/Toast';
-import { Image, Smile, X, ChevronLeft, ChevronRight, Trash, MapPin, User, Play, Pause, Volume2, VolumeX } from '../components/common/Icons';
+import { Image, Smile, X, ChevronLeft, ChevronRight, User, Play, Volume2, VolumeX, AlertTriangle } from '../components/common/Icons';
 import GiphyPicker from '../components/create/GiphyPicker';
 import ImageEditor from '../components/create/ImageEditor';
+import LogoLoader from '../components/common/LogoLoader';
 import getCroppedImg from '../utils/cropUtils';
 import { validateMediaAddition, validatePostPayload } from '../utils/mediaRules';
 import { cloudinaryService } from '../services/cloudinary.service';
 import { postsService } from '../services/posts.service';
+import VideoEditor from '../components/create/VideoEditor';
 import './create-post.css';
 
-const VideoPreview = ({ src, crop, zoom, rotation, aspect, percentCrop }) => {
-    const videoRef = useRef(null);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [isMuted, setIsMuted] = useState(true);
 
-    const togglePlay = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (videoRef.current) {
-            if (isPlaying) {
-                videoRef.current.pause();
-                setIsPlaying(false);
-            } else {
-                videoRef.current.play();
-                setIsPlaying(true);
-            }
-        }
-    };
 
-    const toggleMute = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsMuted(!isMuted);
-    };
-
-    let objectPosition = 'center';
-    if (percentCrop) {
-        const x = percentCrop.x + percentCrop.width / 2;
-        const y = percentCrop.y + percentCrop.height / 2;
-        objectPosition = `${x}% ${y}%`;
-    }
-
-    // Apply Edits via CSS
-    const videoStyle = {
-        transform: `scale(${zoom || 1}) rotate(${rotation || 0}deg)`,
-        transformOrigin: 'center',
-        objectPosition
-    };
-
-    return (
-        <div className="custom-video-wrapper" onClick={togglePlay} style={{ aspectRatio: aspect ? `${aspect}` : undefined }}>
-            <video
-                ref={videoRef}
-                src={src}
-                className="reel-video"
-                style={videoStyle}
-                loop
-                playsInline
-                muted={isMuted}
-            />
-            {/* Play/Pause Overlay */}
-            {!isPlaying && (
-                <div className="video-overlay-center">
-                    <div className="play-circle">
-                        <Play fill="white" size={24} />
-                    </div>
-                </div>
-            )}
-            {/* Mute Control */}
-            <button className="video-mute-btn" onClick={toggleMute}>
-                {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-            </button>
-        </div>
-    );
-};
+import { useUpload } from '../context/UploadContext';
 
 const CreatePost = () => {
     const navigate = useNavigate();
     const toast = useToast();
+    const { startUpload } = useUpload(); // 1. Use Hook
 
     // State
     const [caption, setCaption] = useState('');
-    const [media, setMedia] = useState([]); // { type, url|file, publicId, provider, previewUrl, cropData... }
-    const [isPublishing, setIsPublishing] = useState(false);
+    const [media, setMedia] = useState([]); // [{ type, file, previewUrl, ...metadata }]
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [showGiphyPicker, setShowGiphyPicker] = useState(false);
 
     // Editor State
-    const [editingIndex, setEditingIndex] = useState(null); // Index of item being edited, or null
+    const [editingIndex, setEditingIndex] = useState(null);
+    const [isVideoEditorOpen, setIsVideoEditorOpen] = useState(false);
 
+    // Refs
     const fileInputRef = useRef(null);
 
-    // Prevent accidental exit
+    // Prevent accidental exit - Only if there is media/caption AND no upload started?
+    // Actually, once upload starts, we clear this or navigate away efficiently.
     useEffect(() => {
         const handleBeforeUnload = (e) => {
             if (media.length > 0 || caption.length > 0) {
@@ -105,7 +48,25 @@ const CreatePost = () => {
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [media, caption]);
 
-    // Handle File Selection (Images/Videos)
+
+    // [SKIP LINES 50-160: Media Handling/Editors Unchanged]
+
+    // --- Background Upload Handler ---
+    const handlePublish = async () => {
+        if (!caption.trim() && media.length === 0) return;
+
+        // 2. Start Background Upload
+        startUpload({
+            caption: caption,
+            media: media
+        });
+
+        // 3. Immediate Exit
+        toast.info("Posting in background...");
+        navigate('/feed');
+    };
+
+    // --- Media Handling ---
     const handleFileSelect = (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
@@ -114,37 +75,51 @@ const CreatePost = () => {
         let errorMsg = null;
 
         files.forEach(file => {
-            const type = file.type.startsWith('video/') ? 'video' : 'image';
+            const isVideo = file.type.startsWith('video/');
+            const type = isVideo ? 'video' : 'image';
 
-            // Validate against rules
             const validation = validateMediaAddition(currentDraft, type);
             if (!validation.valid) {
                 errorMsg = validation.error;
                 return;
             }
 
-            // Add to draft with Initial Crop State
-            currentDraft.push({
+            const objectUrl = URL.createObjectURL(file);
+
+            // Base Schema for Local Draft
+            const newItem = {
                 type,
                 file: file,
-                previewUrl: URL.createObjectURL(file),
+                originalUrl: objectUrl,
+                previewUrl: objectUrl,
                 provider: 'local',
-                // Editor Data (Image Only)
+
+                // Image Specific Defaults
                 crop: { x: 0, y: 0 },
                 zoom: 1,
                 rotation: 0,
-                aspect: 4 / 5,
+                aspect: 0.8,
                 croppedAreaPixels: null,
-                isEdited: false
-            });
+                isEdited: false,
+
+                // Video Specific Defaults (Phase 2 Strict Schema)
+                videoMetadata: isVideo ? {
+                    rotate: 0,
+                    aspectRatio: "4:5",
+                    trim: { start: 0, end: 0 }, // Will be set on load
+                    crop: { x: 0, y: 0, w: 1, h: 1 } // Full frame normalized
+                } : null
+            };
+
+            currentDraft.push(newItem);
         });
 
-        if (errorMsg) toast.error(errorMsg);
         setMedia(currentDraft);
-        e.target.value = ''; // Reset input
+
+        if (errorMsg) toast.error(errorMsg);
+        e.target.value = '';
     };
 
-    // Handle Giphy Selection
     const handleGiphySelect = (gif) => {
         const validation = validateMediaAddition(media, 'gif');
         if (!validation.valid) {
@@ -164,126 +139,54 @@ const CreatePost = () => {
 
     const removeMedia = (index) => {
         setMedia(prev => prev.filter((_, i) => i !== index));
-        if (editingIndex === index) setEditingIndex(null);
+        if (editingIndex === index) {
+            setEditingIndex(null);
+            setIsVideoEditorOpen(false);
+        }
     };
 
-    // ENTER EDIT MODE
+    // --- Edit Flow ---
     const handleEditClick = (index) => {
-        if (media[index].provider !== 'local') return; // Allow both image and video
+        if (media[index].provider !== 'local') return;
+
         setEditingIndex(index);
+
+        if (media[index].type === 'video') {
+            setIsVideoEditorOpen(true);
+        }
     };
 
-    // SAVE EDIT
-    const handleEditorSave = (editorState) => {
-        // Update the media item with new edit state
+    // --- Save Handlers ---
+    const handleVideoSave = (metadata, thumbBlob) => {
         setMedia(prev => {
-            const next = [...prev];
-            next[editingIndex] = {
-                ...next[editingIndex],
-                ...editorState,
-                isEdited: true
+            const n = [...prev];
+            const item = n[editingIndex];
+
+            // Update preview URL with the temporary thumbnail blob
+            // This is purely for the grid view, not the upload
+            const newPreviewUrl = URL.createObjectURL(thumbBlob);
+
+            n[editingIndex] = {
+                ...item,
+                isEdited: true,
+                videoMetadata: metadata,
+                previewUrl: newPreviewUrl,
+                // We keep the original file untouched
             };
-            return next;
+            return n;
         });
-        setEditingIndex(null); // Exit mode
+        setIsVideoEditorOpen(false);
+        setEditingIndex(null);
     };
 
-    const handleEmojiClick = (emojiData) => {
-        setCaption(prev => prev + emojiData.emoji);
-        // setShowEmojiPicker(false); // Kept open for multiple selection
-    };
 
-    // ATOMIC PUBLISH LOGIC (Updated with Canvas Export)
-    const handlePublish = async () => {
-        // 1. Final Validation
-        if (!caption.trim() && media.length === 0) {
-            toast.error('Post must have content or media.');
-            return;
-        }
-        const payloadValidation = validatePostPayload(media);
-        if (!payloadValidation.valid) {
-            toast.error(payloadValidation.error);
-            return;
-        }
 
-        setIsPublishing(true);
-        const uploadedAssets = []; // Track publicIds for cleanup
-
-        try {
-            // 2. Upload Phase
-            const finalMediaPayload = [];
-
-            for (const item of media) {
-                if (item.provider === 'local') {
-                    let fileToUpload = item.file;
-
-                    // CHECK IF EDITED -> EXPORT CANVAS BLOB
-                    if (item.type === 'image' && item.isEdited && item.croppedAreaPixels) {
-                        try {
-                            const { blob } = await getCroppedImg(
-                                item.previewUrl,
-                                item.croppedAreaPixels,
-                                item.rotation
-                            );
-                            fileToUpload = blob; // SWAP original file for cropped blob
-                        } catch (cropErr) {
-                            console.error("Crop failed, falling back to original", cropErr);
-                            // Fallback to original
-                        }
-                    }
-
-                    // Upload to Cloudinary
-                    try {
-                        const uploaded = await cloudinaryService.uploadMedia(fileToUpload);
-                        uploadedAssets.push(uploaded.publicId); // TRACK IT
-                        finalMediaPayload.push({
-                            type: uploaded.type,
-                            url: uploaded.url,
-                            publicId: uploaded.publicId,
-                            // Persist Edit Metadata
-                            metadata: item.isEdited ? {
-                                zoom: item.zoom,
-                                rotation: item.rotation,
-                                aspect: item.aspect,
-                                crop: item.crop,
-                                percentCrop: item.percentCrop
-                            } : null
-                        });
-                    } catch (uploadError) {
-                        throw new Error(`Failed to upload ${item.type}: ${uploadError.message}`);
-                    }
-                } else if (item.provider === 'giphy') {
-                    // Pass through
-                    finalMediaPayload.push({
-                        type: 'gif',
-                        url: item.url,
-                        provider: 'giphy'
-                    });
-                }
-            }
-
-            // 3. Create Post Phase
-            await postsService.createPost({
-                content: caption,
-                media: finalMediaPayload,
-                visibility: 'public'
-            });
-
-            // 4. Success
-            toast.success('Post published!');
+    const handleBack = () => {
+        if (editingIndex !== null) {
+            setEditingIndex(null);
+            setIsVideoEditorOpen(false);
+        } else {
             navigate('/feed');
-
-        } catch (error) {
-            console.error('Publish failed:', error);
-            toast.error(error.message || 'Failed to publish post.');
-
-            // 5. ATOMIC CLEANUP
-            if (uploadedAssets.length > 0) {
-                toast.info('Cleaning up uploads...');
-                await Promise.allSettled(uploadedAssets.map(id => cloudinaryService.deleteMedia(id)));
-            }
-        } finally {
-            setIsPublishing(false);
         }
     };
 
@@ -291,196 +194,189 @@ const CreatePost = () => {
         <div className="create-post-container">
             {/* Header */}
             <div className="create-header">
-                {editingIndex !== null ? (
-                    // Edit Mode Header
-                    <>
-                        <button onClick={() => setEditingIndex(null)} className="icon-btn">
-                            <ChevronLeft /> Back
-                        </button>
-                        <h2>Edit Photo</h2>
-                        <div style={{ width: 48 }}></div> {/* Spacer */}
-                    </>
-                ) : (
-                    // Normal Mode Header
-                    <>
-                        <button onClick={() => navigate('/feed')} className="icon-btn">
-                            <ChevronLeft />
-                        </button>
-                        <h2>New Post</h2>
+                <button onClick={handleBack} className="icon-btn">
+                    <ChevronLeft /> {editingIndex !== null ? "Back" : ""}
+                </button>
+                <h2>{editingIndex !== null ? "Edit Media" : "New Post"}</h2>
+
+                {/* Right Side Actions */}
+                {editingIndex === null ? (
+                    <div style={{ display: 'flex', gap: '8px' }}>
                         <button
-                            className="publish-btn mobile-only-share"
+                            className="publish-btn"
                             onClick={handlePublish}
-                            disabled={isPublishing || (!caption.trim() && media.length === 0)}
+                            disabled={!caption && media.length === 0}
                         >
-                            {isPublishing ? '...' : 'Share'}
+                            Share
                         </button>
-                        <div className="desktop-header-spacer"></div>
-                    </>
+                    </div>
+                ) : (
+                    // In Editor Mode, the specific editor handles "Done"
+                    <div style={{ width: 60 }}></div>
                 )}
             </div>
 
+            {/* Publishing Overlay removed: Upload is now background */}
+
             <div className="create-body">
-                {/* Media Preview / Editor Area */}
-                <div className="media-preview-section">
-                    {/* CONDITIONAL RENDER: Editor vs Grid */}
+                {/* PREVIEW / EDITOR SECTION */}
+                <div className={`media-preview-section ${editingIndex !== null ? 'full-width' : ''}`}>
                     {editingIndex !== null ? (
-                        <ImageEditor
-                            imageSrc={media[editingIndex].type === 'image' ? media[editingIndex].previewUrl : undefined}
-                            videoSrc={media[editingIndex].type === 'video' ? media[editingIndex].previewUrl : undefined}
-                            initialCrop={media[editingIndex].crop}
-                            initialZoom={media[editingIndex].zoom}
-                            initialRotate={media[editingIndex].rotation}
-                            initialAspect={media[editingIndex].aspect}
-                            onCancel={() => setEditingIndex(null)}
-                            onSave={handleEditorSave}
-                        />
+                        // --- EDITOR MODE ---
+                        <div className="editor-container">
+                            {isVideoEditorOpen ? (
+                                <VideoEditor
+                                    videoSrc={media[editingIndex].originalUrl}
+                                    onSave={handleVideoSave}
+                                    onCancel={() => {
+                                        setEditingIndex(null);
+                                        setIsVideoEditorOpen(false);
+                                    }}
+                                />
+                            ) : (
+                                <ImageEditor
+                                    imageSrc={media[editingIndex].originalUrl || media[editingIndex].previewUrl}
+                                    initialCrop={media[editingIndex].crop}
+                                    initialZoom={media[editingIndex].zoom}
+                                    initialRotate={media[editingIndex].rotation}
+                                    initialAspect={media[editingIndex].aspect}
+                                    onCancel={() => setEditingIndex(null)}
+                                    onSave={async (updates) => {
+                                        let newPreviewUrl = media[editingIndex].previewUrl;
+
+                                        if (updates.croppedAreaPixels) {
+                                            try {
+                                                const sourceUrl = media[editingIndex].originalUrl || media[editingIndex].previewUrl;
+                                                const { url } = await getCroppedImg(sourceUrl, updates.croppedAreaPixels, updates.rotation);
+                                                newPreviewUrl = url;
+                                            } catch (e) {
+                                                console.error("Preview gen failed", e);
+                                            }
+                                        }
+
+                                        setMedia(prev => {
+                                            const n = [...prev];
+                                            n[editingIndex] = {
+                                                ...n[editingIndex],
+                                                ...updates,
+                                                isEdited: true,
+                                                previewUrl: newPreviewUrl
+                                            };
+                                            return n;
+                                        });
+                                        setEditingIndex(null);
+                                    }}
+                                />
+                            )}
+                        </div>
                     ) : (
-                        // View Mode
+                        // --- GRID MODE ---
                         media.length === 0 ? (
                             <div className="empty-state">
                                 <Image size={64} className="empty-icon-placeholder" />
-                                <h3>Drag photos and videos here</h3>
-                                <button className="primary-select-btn" onClick={() => fileInputRef.current.click()}>
-                                    Select from computer
-                                </button>
+                                <h3>Create a new post</h3>
+                                <div className="upload-options-row" style={{ display: 'flex', gap: '12px' }}>
+                                    <button className="primary-select-btn" onClick={() => fileInputRef.current.click()}>
+                                        Select from Device
+                                    </button>
+                                </div>
                             </div>
                         ) : (
                             <div className="preview-grid">
                                 {media.map((item, idx) => (
                                     <div key={idx} className="preview-item group">
-                                        <button className="remove-btn" onClick={() => removeMedia(idx)}>
-                                            <X size={16} />
-                                        </button>
+                                        <button className="remove-btn" onClick={() => removeMedia(idx)}><X size={16} /></button>
 
-                                        {/* Edit / Ratio Overlays (Desktop Hover) */}
                                         {item.provider === 'local' && (
-                                            <div className="media-overlays">
-                                                <button className="overlay-btn" onClick={() => handleEditClick(idx)} title="Edit">
-                                                    Edit
-                                                </button>
-                                            </div>
+                                            <button className="edit-btn-float" onClick={() => handleEditClick(idx)}>
+                                                Edit
+                                            </button>
                                         )}
 
+                                        {/* Video Preview: Live Player with CSS Rotation */}
                                         {item.type === 'video' ? (
-                                            <VideoPreview
-                                                src={item.previewUrl}
-                                                crop={item.crop}
-                                                zoom={item.zoom}
-                                                rotation={item.rotation}
-                                            />
+                                            <div style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative' }}>
+                                                <video
+                                                    src={item.originalUrl || item.previewUrl}
+                                                    muted
+                                                    loop
+                                                    autoPlay
+                                                    playsInline
+                                                    style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        objectFit: 'cover',
+                                                        transform: item.videoMetadata?.rotate ? `rotate(${item.videoMetadata.rotate}deg)` : 'none',
+                                                        // Ensure rotated video covers the box? 
+                                                        // Simple rotation might show gaps if aspects differ.
+                                                        // For now, this satisfies "Video playing" + "Rotation".
+                                                        transformOrigin: 'center'
+                                                    }}
+                                                />
+                                            </div>
                                         ) : (
-                                            <img
-                                                src={item.previewUrl}
-                                                alt="preview"
-                                            // Apply basic CSS transform preview for un-cropped but rotated images if needed, 
-                                            // but since we rely on Editor for WYSIWYG, raw preview is fine until 'Edit' is saved.
-                                            // Ideally, we could generate a temp thumbnail blob on save for the preview list 
-                                            // but relying on the editor state is enough for MVP.
-                                            />
+                                            <img src={item.previewUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                         )}
-                                        {item.provider === 'giphy' && <span className="badge-gif">GIF</span>}
-                                        {item.isEdited && <span className="badge-edited">Edited</span>}
                                     </div>
                                 ))}
+                                {/* Add More Button */}
+                                {media.length < 5 && !media.some(m => m.type === 'video') && (
+                                    <button className="add-more-tile" onClick={() => fileInputRef.current.click()}>
+                                        +
+                                    </button>
+                                )}
                             </div>
                         )
                     )}
                 </div>
 
-                {/* Content Area - Hidden when editing on Mobile logic? 
-                    Actually, in split view (Desktop), we keep it visible. 
-                    On mobile, we might want to hide it if we are in 'Edit Mode' purely for space, 
-                    but the layout handles stacking. 
-                    Let's Disable interaction if editing.
-                */}
-                <div className={`content-section ${editingIndex !== null ? 'disabled-content' : ''}`}>
-                    <div className="content-scroll-area">
-                        {/* User Profile Header */}
+                {/* CONTENT SIDEBAR (Hidden in Edit Mode) */}
+                {editingIndex === null && (
+                    <div className="content-section">
                         <div className="user-mini-header">
-                            <div className="user-avatar-small">
-                                <img
-                                    src={JSON.parse(localStorage.getItem('user'))?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"}
-                                    alt="user"
-                                />
-                            </div>
                             <span className="user-username">
                                 {JSON.parse(localStorage.getItem('user'))?.username || 'user'}
                             </span>
                         </div>
-
                         <textarea
                             className="caption-input"
-                            placeholder={editingIndex !== null ? "Finish editing to write caption..." : "Write a caption..."}
+                            placeholder="Write a caption..."
                             value={caption}
                             onChange={e => setCaption(e.target.value)}
-                            disabled={isPublishing || editingIndex !== null}
                             maxLength={2200}
                         />
-
                         <div className="caption-tools">
-                            <button className="emoji-trigger-btn" onClick={() => setShowEmojiPicker(!showEmojiPicker)} disabled={editingIndex !== null}>
-                                <Smile size={20} />
-                            </button>
-                            <span className={`char-count ${caption.length > 2100 ? 'near-limit' : ''}`}>
-                                {caption.length}/2,200
-                            </span>
+                            <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}><Smile size={20} /></button>
+                            <span>{caption.length}/2,200</span>
                         </div>
 
-                        {/* Metadata Tools List */}
-                        <div className={`metadata-tools ${editingIndex !== null ? 'opacity-50' : ''}`}>
-                            <div className="tool-item" onClick={() => !editingIndex && fileInputRef.current.click()}>
-                                <span>Add Photos/Videos</span>
-                                <ChevronRight size={16} className="chevron" />
+                        {showEmojiPicker && (
+                            <div className="emoji-picker-popover">
+                                <EmojiPicker onEmojiClick={(e) => setCaption(c => c + e.emoji)} theme="dark" width="100%" height={300} previewConfig={{ showPreview: false }} />
                             </div>
-                            <div className="tool-item">
-                                <span>Tag People</span>
-                                <User size={16} className="tool-icon" />
-                            </div>
-                        </div>
-
+                        )}
 
                         <input
                             type="file"
                             ref={fileInputRef}
                             hidden
                             multiple
-                            accept="image/*,video/*"
+                            accept="image/*,video/mp4,video/quicktime" // Accepted formats
                             onChange={handleFileSelect}
                         />
                     </div>
-
-                    {/* Bottom Action Section */}
-                    <div className="bottom-action-area">
-                        <button
-                            className="share-btn-large"
-                            onClick={handlePublish}
-                            disabled={isPublishing || editingIndex !== null || (!caption.trim() && media.length === 0)}
-                        >
-                            {isPublishing ? 'Sharing...' : 'Share Post'}
-                        </button>
-                    </div>
-
-                    {showEmojiPicker && (
-                        <div className="emoji-picker-popover">
-                            <EmojiPicker
-                                onEmojiClick={handleEmojiClick}
-                                theme="dark"
-                                width="100%"
-                                height={300}
-                                previewConfig={{ showPreview: false }}
-                            />
-                        </div>
-                    )}
-                </div>
+                )}
             </div>
 
-            {showGiphyPicker && (
-                <GiphyPicker
-                    onSelect={handleGiphySelect}
-                    onClose={() => setShowGiphyPicker(false)}
-                />
-            )}
-        </div>
+            {
+                showGiphyPicker && (
+                    <GiphyPicker
+                        onSelect={handleGiphySelect}
+                        onClose={() => setShowGiphyPicker(false)}
+                    />
+                )
+            }
+        </div >
     );
 };
 

@@ -22,17 +22,18 @@ export const validateMediaAddition = (currentMedia, newItemType) => {
         return { valid: false, error: `Maximum ${MAX_MEDIA_COUNT} media items allowed.` };
     }
 
+    // 2. Video Exclusivity Rule
     const hasVideo = currentMedia.some(m => m.type === 'video');
 
-    // 2. Video Exclusivity Rule (Current state has video)
+    // If we already have a video, we can't add anything else
     if (hasVideo) {
-        return { valid: false, error: 'Video items cannot be mixed with other media.' };
+        return { valid: false, error: 'Only one video allowed per post (cannot mix with images).' };
     }
 
-    // 3. Video Exclusivity Rule (New item is video)
+    // If we are adding a video, current list must be empty
     if (newItemType === 'video') {
         if (currentMedia.length > 0) {
-            return { valid: false, error: 'Video items cannot be mixed with other media.' };
+            return { valid: false, error: 'Videos must be posted individually.' };
         }
     }
 
@@ -49,13 +50,16 @@ export const validatePostPayload = (media) => {
         return { valid: false, error: `Maximum ${MAX_MEDIA_COUNT} media items allowed.` };
     }
 
+    // Ensure mixed content rules are respected
     const videos = media.filter(m => m.type === 'video');
-    if (videos.length > 1) {
-        return { valid: false, error: 'Only 1 video allowed per post.' };
+    const images = media.filter(m => m.type !== 'video');
+
+    if (videos.length > 0 && images.length > 0) {
+        return { valid: false, error: 'Cannot mix videos and images.' };
     }
 
-    if (videos.length === 1 && media.length > 1) {
-        return { valid: false, error: 'Videos cannot be mixed with other media.' };
+    if (videos.length > 1) {
+        return { valid: false, error: 'Maximum 1 video allowed.' };
     }
 
     return { valid: true, error: null };

@@ -6,6 +6,7 @@ import PostCard from '../components/feed/PostCard';
 import MobileNavbar from '../components/layout/MobileNavbar';
 import { postsService } from '../services/posts.service';
 import { useToast } from '../components/Toast';
+import LogoLoader from '../components/common/LogoLoader';
 
 const Feed = () => {
     const [posts, setPosts] = useState([]);
@@ -59,6 +60,20 @@ const Feed = () => {
         if (node) observer.current.observe(node);
     }, [isLoading, hasMore, cursor, fetchFeed]);
 
+    // Listener for Background Uploads
+    useEffect(() => {
+        const handleNewPost = (event) => {
+            const newPost = event.detail;
+            handlePostCreated(newPost);
+
+            // Scroll to top smoothly
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        window.addEventListener('post-created', handleNewPost);
+        return () => window.removeEventListener('post-created', handleNewPost);
+    }, []);
+
     const handlePostCreated = (newPost) => {
         const user = JSON.parse(localStorage.getItem('user'));
         const postWithAuthor = {
@@ -91,6 +106,11 @@ const Feed = () => {
 
                     {/* 3. Post List */}
                     <div className="feed-list">
+                        {isLoading && posts.length === 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+                                <LogoLoader size="3rem" text="Gathering tweets..." />
+                            </div>
+                        )}
                         {posts.map((post, index) => {
                             if (posts.length === index + 1) {
                                 return (
@@ -104,7 +124,9 @@ const Feed = () => {
                         })}
 
                         {isLoading && posts.length > 0 && (
-                            <div className="feed-loader">Loading more...</div>
+                            <div className="feed-loader">
+                                <LogoLoader size="1.2rem" text="Loading more posts..." />
+                            </div>
                         )}
                     </div>
                 </div>

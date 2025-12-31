@@ -15,11 +15,11 @@ cloudinary.config({
  * 
  * @param {string} publicId - The public ID of the asset to delete.
  */
-const deleteMedia = async (publicId) => {
+const deleteMedia = async (publicId, resourceType = 'image') => {
     try {
         if (!publicId) return;
-        console.log(`[Cloudinary] Deleting asset: ${publicId}`);
-        const result = await cloudinary.uploader.destroy(publicId);
+        console.log(`[Cloudinary] Deleting asset: ${publicId} (${resourceType})`);
+        const result = await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
         if (result.result !== 'ok') {
             console.error(`[Cloudinary] Delete failed for ${publicId}:`, result);
         } else {

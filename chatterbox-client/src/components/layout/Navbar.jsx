@@ -3,6 +3,7 @@ import './Navbar.css';
 import Avatar from '../common/Avatar';
 import BrandLogo from '../common/BrandLogo';
 import { Home, Grid, Bookmark, Send, BarChart, Settings, LogOut, User, Plus } from '../common/Icons';
+import SettingsModal from '../common/SettingsModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const Navbar = () => {
@@ -11,6 +12,8 @@ const Navbar = () => {
 
     // Auto-collapse on tablet (<= 1100px)
     const [isCollapsed, setIsCollapsed] = useState(window.innerWidth <= 1100);
+    // Modals
+    const [showSettings, setShowSettings] = useState(false);
 
     useEffect(() => {
         const handleResize = () => {
@@ -54,6 +57,10 @@ const Navbar = () => {
     ];
 
     const handleNavigation = (path) => {
+        if (path === '/settings') {
+            setShowSettings(true);
+            return;
+        }
         navigate(path);
     };
 
@@ -125,6 +132,8 @@ const Navbar = () => {
                     {!isCollapsed && <span>Logout</span>}
                 </div>
             </div>
+
+            <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
         </nav>
     );
 };

@@ -108,7 +108,11 @@ exports.deletePost = async (req, res) => {
         if (post.media && post.media.length > 0) {
             post.media.forEach(item => {
                 if (item.publicId) {
-                    deleteMedia(item.publicId);
+                    // Map our schema types to Cloudinary resource types
+                    // 'video' -> 'video'
+                    // 'image', 'gif' -> 'image'
+                    const resourceType = item.type === 'video' ? 'video' : 'image';
+                    deleteMedia(item.publicId, resourceType);
                 }
             });
         }

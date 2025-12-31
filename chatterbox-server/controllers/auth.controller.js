@@ -114,7 +114,13 @@ const googleLogin = async (req, res) => {
             }
         });
 
+        console.log("Google UserInfo Response:", googleResponse.data);
+
         const { name, email, sub: googleId } = googleResponse.data;
+
+        if (!email) {
+            return res.status(400).json({ message: "Google account does not have a verified email." });
+        }
 
         // 2. Check if user exists
         let user = await User.findOne({ email });

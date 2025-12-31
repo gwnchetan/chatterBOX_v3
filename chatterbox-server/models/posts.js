@@ -21,9 +21,21 @@ const postSchema = new mongoose.Schema({
         },
         type: {
             type: String,
-            enum: ['image', 'video'],
+            enum: ['image', 'video', 'gif'],
             required: true
         },
+        // Layout & Playback Metadata (Explicit)
+        width: Number,          // Final Rendered Width
+        height: Number,         // Final Rendered Height
+        aspectRatio: Number,    // Layout Ratio (height/width)
+        originalRatio: Number,  // Native Video Ratio
+        rotation: {
+            type: Number,
+            default: 0
+        },
+        duration: Number,       // In seconds
+        thumbnailUrl: String,
+
         metadata: {
             type: mongoose.Schema.Types.Mixed
         }

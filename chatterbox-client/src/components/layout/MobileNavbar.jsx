@@ -23,20 +23,20 @@ const MobileNavbar = () => {
                 </button>
 
                 <button
-                    className={`mobile-nav-item ${isActive('/create') ? 'active' : ''}`}
-                    onClick={() => navigate('/create')}
-                >
-                    <div className="icon-wrapper center-action">
-                        <Plus size={24} />
-                    </div>
-                </button>
-
-                <button
                     className={`mobile-nav-item ${isActive('/explore') ? 'active' : ''}`}
                     onClick={() => navigate('/explore')}
                 >
                     <div className="icon-wrapper">
                         <Search size={24} />
+                    </div>
+                </button>
+
+                <button
+                    className={`mobile-nav-item ${isActive('/create') ? 'active' : ''}`}
+                    onClick={() => navigate('/create')}
+                >
+                    <div className="icon-wrapper center-action">
+                        <Plus size={24} />
                     </div>
                 </button>
 
@@ -50,8 +50,11 @@ const MobileNavbar = () => {
                 </button>
 
                 <button
-                    className={`mobile-nav-item ${isActive('/profile') ? 'active' : ''}`}
-                    onClick={() => navigate('/profile')}
+                    className={`mobile-nav-item ${location.pathname.startsWith('/profile') ? 'active' : ''}`}
+                    onClick={() => {
+                        const user = JSON.parse(localStorage.getItem('user')) || {};
+                        navigate(`/profile/${user.id || user._id}`);
+                    }}
                 >
                     <div className="icon-wrapper">
                         <User size={24} />

@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react'; // Added useEffect
 import Avatar from '../common/Avatar';
-import { MoreHorizontal, Heart, MessageSquare, Share2, Repeat, ChevronLeft, ChevronRight, Trash } from '../common/Icons';
+import { MoreHorizontal, Heart, MessageSquare, Share2, Repeat, ChevronLeft, ChevronRight, Trash, Bookmark } from '../common/Icons'; // Added Bookmark
+import userService from '../../services/user.service'; // Default import (fixed from postsService relative path if needed, but postsService is there too)
 import { postsService } from '../../services/posts.service';
 import { useToast } from '../Toast';
 import ConfirmModal from '../common/ConfirmModal';
@@ -10,9 +11,54 @@ import VideoPlayer from './VideoPlayer';
 
 const PostCard = ({ post, onDelete }) => {
     const [liked, setLiked] = useState(false);
+    const [saved, setSaved] = useState(false); // Saved state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(localStorage.getItem('user')) || {}; // Safe parse
     const isAuthor = user && (post.author?._id === user._id || post.author?._id === user.id || post.author === user.id);
+    const toast = useToast();
+
+    // Check if saved on mount
+    useEffect(() => {
+        if (user.savedPosts && Array.isArray(user.savedPosts)) {
+            // savedPosts might be array of IDs or Objects
+            const isSaved = user.savedPosts.some(p => (p._id || p) === post._id);
+            setSaved(isSaved);
+        }
+    }, [post._id]);
+
+    const handleSave = async (e) => {
+        e.stopPropagation();
+        const originalSaved = saved;
+        setSaved(!saved); // Optimistic
+
+        try {
+            if (originalSaved) {
+                await userService.unsavePost(post._id);
+            } else {
+                await userService.savePost(post._id);
+            }
+
+            // Update local storage to keep UI consistent across refreshes/pages
+            const currentUser = JSON.parse(localStorage.getItem('user')) || {};
+            let currentSaved = currentUser.savedPosts || [];
+
+            if (originalSaved) {
+                // Removed
+                currentSaved = currentSaved.filter(p => (p._id || p) !== post._id);
+            } else {
+                // Added (just ID is enough for check)
+                currentSaved.push(post._id);
+            }
+
+            currentUser.savedPosts = currentSaved;
+            localStorage.setItem('user', JSON.stringify(currentUser));
+
+        } catch (error) {
+            console.error("Save failed", error);
+            setSaved(originalSaved); // Revert
+            toast.error("Failed to save post");
+        }
+    };
 
     // Slider-based image logic
     const [currentSlide, setCurrentSlide] = useState(0);
@@ -174,6 +220,12 @@ const PostCard = ({ post, onDelete }) => {
                 <button className="action-item">
                     <div className="icon-container">
                         <Share2 />
+                    </div>
+                </button>
+
+                <button className="action-item" onClick={handleSave}>
+                    <div className={`icon-container ${saved ? 'saved' : ''}`}>
+                        <Bookmark fill={saved ? "var(--color-text-main)" : "none"} />
                     </div>
                 </button>
             </div>

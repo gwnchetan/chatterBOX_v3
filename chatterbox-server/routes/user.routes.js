@@ -1,0 +1,28 @@
+const express = require('express');
+const router = express.Router();
+const userController = require('../controllers/user.controller');
+const authMiddleware = require('../middleware/auth.middleware'); // Assuming it exists
+
+// All profile routes require authentication
+// router.use(authMiddleware); 
+
+// Search (Must be before /:userId)
+router.get('/search', authMiddleware, userController.searchUsers);
+router.get('/saved', authMiddleware, userController.getSavedPosts); // Get my saved posts
+
+// Save/Unsave actions (Must be before /:userId)
+router.post('/save/:postId', authMiddleware, userController.savePost);
+router.post('/unsave/:postId', authMiddleware, userController.unsavePost);
+
+// Update profile
+router.patch('/profile', authMiddleware, userController.updateProfile);
+
+// User Profile & Posts
+router.get('/:userId', userController.getUserProfile);
+router.get('/:userId/posts', userController.getUserPosts);
+
+// Follow/Unfollow
+router.post('/:userId/follow', authMiddleware, userController.followUser);
+router.post('/:userId/unfollow', authMiddleware, userController.unfollowUser);
+
+module.exports = router;

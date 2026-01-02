@@ -1,6 +1,6 @@
 /* Navbar.css */
 .navbar {
-    position: fixed;
+    position: sticky;
     top: 0;
     left: 0;
     height: 100vh;
@@ -220,10 +220,9 @@
 }
 
 /* Responsiveness - Mobile Hidden */
-@media (max-width: 1024px) {
+@media (max-width: 700px) {
     .navbar {
-        transform: translateX(-100%);
-        width: 0;
-        padding: 0;
+        display: none;
+        /* Simply hide it, let MobileNavbar take over */
     }
 }

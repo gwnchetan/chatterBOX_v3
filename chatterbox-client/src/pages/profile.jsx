@@ -1,0 +1,364 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import userService from '../services/user.service';
+import PostCard from '../components/feed/PostCard';
+import ProfilePostCard from '../components/feed/ProfilePostCard';
+import { MapPin, Link as LinkIcon, Calendar, Edit3, Grid, List as ListIcon, Heart, MessageSquare } from '../components/common/Icons';
+import { useToast } from '../components/Toast';
+import EditProfileModal from '../components/profile/EditProfileModal';
+import PostDetailModal from '../components/profile/PostDetailModal';
+import Navbar from '../components/layout/Navbar';
+import MobileNavbar from '../components/layout/MobileNavbar';
+import './profile.css';
+
+const Profile = () => {
+    const { userId: paramId } = useParams();
+    const navigate = useNavigate();
+    const toast = useToast();
+
+    const [userId, setUserId] = useState(paramId);
+    const [profile, setProfile] = useState(null);
+    const [posts, setPosts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [viewMode, setViewMode] = useState('list'); // Default to list
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [selectedPost, setSelectedPost] = useState(null);
+    const [isFollowing, setIsFollowing] = useState(false);
+    const [followLoading, setFollowLoading] = useState(false);
+
+    const currentUser = JSON.parse(localStorage.getItem('user'));
+    const isOwner = currentUser && (userId === (currentUser.id || currentUser._id));
+
+    // Check if following
+    useEffect(() => {
+        const checkFollowingStatus = async () => {
+            if (currentUser && userId && !isOwner) {
+                // We need to know if currentUser follows userId.
+                // Since we don't have a direct API for "isFollowing", we fetch current user's profile to see their following list.
+                // Optimization: In a real app, the profile API for 'userId' should return 'isFollowedByViewer'.
+                try {
+                    const myProfile = await userService.getProfile(currentUser.id || currentUser._id);
+                    const isFound = myProfile.user.following.some(f => (f._id || f) === userId);
+                    setIsFollowing(isFound);
+                } catch (e) {
+                    console.error("Error checking follow status", e);
+                }
+            }
+        };
+        checkFollowingStatus();
+    }, [userId, isOwner]);
+
+    const handleFollowToggle = async () => {
+        if (followLoading) return;
+        setFollowLoading(true);
+        try {
+            if (isFollowing) {
+                await userService.unfollowUser(userId);
+                setIsFollowing(false);
+                setProfile(prev => ({
+                    ...prev,
+                    stats: { ...prev.stats, followers: Math.max(0, prev.stats.followers - 1) }
+                }));
+                toast.success("Unfollowed user");
+            } else {
+                await userService.followUser(userId);
+                setIsFollowing(true);
+                setProfile(prev => ({
+                    ...prev,
+                    stats: { ...prev.stats, followers: prev.stats.followers + 1 }
+                }));
+                toast.success("Followed user");
+            }
+        } catch (error) {
+            console.error("Follow action failed", error);
+            toast.error("Action failed");
+        } finally {
+            setFollowLoading(false);
+        }
+    };
+
+    // 1. Resolve effective userId
+    useEffect(() => {
+        if (!paramId) {
+            const storedUser = JSON.parse(localStorage.getItem('user'));
+            if (storedUser && (storedUser.id || storedUser._id)) {
+                setUserId(storedUser.id || storedUser._id);
+            } else {
+                toast.error("Please login to view your profile");
+                navigate('/');
+            }
+        } else {
+            setUserId(paramId);
+        }
+    }, [paramId, navigate, toast]);
+
+    // Fetch Profile Data
+    const fetchProfile = useCallback(async (uid) => {
+        if (!uid) return;
+        try {
+            const data = await userService.getProfile(uid);
+            setProfile(data.user);
+        } catch (err) {
+            console.error("Profile fetch error:", err);
+            toast.error("Failed to load profile");
+        }
+    }, [toast]);
+
+    // Fetch User Posts
+    const fetchPosts = useCallback(async (uid) => {
+        if (!uid) return;
+        try {
+            const data = await userService.getUserPosts(uid);
+            setPosts(data.posts);
+        } catch (err) {
+            console.error("Posts fetch error:", err);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (userId) {
+            setLoading(true);
+            fetchProfile(userId);
+            fetchPosts(userId);
+        }
+    }, [userId, fetchProfile, fetchPosts]);
+
+    if (loading && !profile) {
+        return <div className="profile-loading">Loading Profile...</div>;
+    }
+
+    if (!profile) {
+        return <div className="profile-error">User not found</div>;
+    }
+
+    return (
+
+        <div className="profile-layout">
+            <Navbar />
+            <div className="profile-page">
+                {/* Header / Banner Section */}
+                <div className="profile-header">
+                    <div className="profile-banner">
+                        {profile.bannerImage ? (
+                            <img src={profile.bannerImage} alt="banner" />
+                        ) : (
+                            <div className="banner-placeholder"></div>
+                        )}
+                        <div className="view-toggle">
+                            <button
+                                className={`toggle-icon ${viewMode === 'grid' ? 'active' : ''}`}
+                                onClick={() => setViewMode('grid')}
+                            >
+                                <Grid size={20} />
+                            </button>
+                            <button
+                                className={`toggle-icon ${viewMode === 'list' ? 'active' : ''}`}
+                                onClick={() => setViewMode('list')}
+                            >
+                                <ListIcon size={20} />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="profile-info-container">
+                        <div className="profile-avatar-row">
+                            <div className="profile-avatar-wrapper">
+                                <img
+                                    src={profile.avatar || 'https://via.placeholder.com/150'}
+                                    alt={profile.username}
+                                    className="profile-avatar"
+                                />
+                            </div>
+                            <div className="profile-actions">
+                                {isOwner ? (
+                                    <button
+                                        className="btn-edit-profile"
+                                        style={{ color: 'var(--color-text-main)', background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+                                        onClick={() => setIsEditModalOpen(true)}
+                                    >
+                                        <Edit3 size={18} />
+                                        <span>Edit Profile</span>
+                                    </button>
+                                ) : (
+                                    <button
+                                        className="btn-edit-profile"
+                                        style={{
+                                            background: isFollowing ? 'transparent' : 'var(--color-primary)',
+                                            border: isFollowing ? '1px solid var(--color-border)' : 'none',
+                                            color: isFollowing ? 'var(--color-text-main)' : '#fff'
+                                        }}
+                                        onClick={handleFollowToggle}
+                                        disabled={followLoading}
+                                    >
+                                        <span>{isFollowing ? 'Unfollow' : 'Follow'}</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="profile-info-text">
+                            <h1 className="profile-fullname">{profile.fullname}</h1>
+                            <p className="profile-username">@{profile.username}</p>
+
+                            {profile.bio && <p className="profile-bio">{profile.bio}</p>}
+
+                            <div className="profile-meta">
+                                {profile.location && (
+                                    <span className="meta-item">
+                                        <MapPin size={16} />
+                                        {profile.location}
+                                    </span>
+                                )}
+                                {profile.website && (
+                                    <span className="meta-item">
+                                        <LinkIcon size={16} />
+                                        <a href={profile.website} target="_blank" rel="noopener noreferrer">
+                                            {profile.website.replace(/^https?:\/\//, '')}
+                                        </a>
+                                    </span>
+                                )}
+                                <span className="meta-item">
+                                    <Calendar size={16} />
+                                    Joined Dec 2025
+                                </span>
+                            </div>
+
+                            <div className="profile-stats">
+                                <div className="stat-item">
+                                    <span className="stat-value">{profile.stats?.posts || 0}</span>
+                                    <span className="stat-label">Posts</span>
+                                </div>
+                                <div className="stat-item">
+                                    <span className="stat-value">{profile.stats?.followers || 0}</span>
+                                    <span className="stat-label">Followers</span>
+                                </div>
+                                <div className="stat-item">
+                                    <span className="stat-value">{profile.stats?.following || 0}</span>
+                                    <span className="stat-label">Following</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Content Tabs / Feed Section */}
+                <div className="profile-content">
+                    <div className="content-tabs">
+                        <button
+                            className={`tab-btn active`}
+                        > Posts </button>
+                        <button className="tab-btn"> Media </button>
+                        <button className="tab-btn"> Likes </button>
+
+                        <div className="view-toggle">
+                            <button
+                                className={`toggle-icon ${viewMode === 'grid' ? 'active' : ''}`}
+                                onClick={() => setViewMode('grid')}
+                            >
+                                <Grid size={20} />
+                            </button>
+                            <button
+                                className={`toggle-icon ${viewMode === 'list' ? 'active' : ''}`}
+                                onClick={() => setViewMode('list')}
+                            >
+                                <ListIcon size={20} />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className={`profile-feed ${viewMode}`}>
+                        {Array.isArray(posts) && posts.length > 0 ? (
+                            viewMode === 'list' ? (
+                                posts.map(post => {
+                                    // Check if post has media
+                                    const hasMedia = post.media && post.media.length > 0;
+
+                                    return (
+                                        <div key={post._id} className="feed-item-wrapper">
+                                            {hasMedia ? (
+                                                <PostCard post={post} onDelete={(deletedId) => setPosts(prev => prev.filter(p => p._id !== deletedId))} />
+                                            ) : (
+                                                <ProfilePostCard post={post} isOwner={isOwner} onDelete={(deletedId) => setPosts(prev => prev.filter(p => p._id !== deletedId))} />
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                posts.map(post => (
+                                    <GridItem
+                                        key={post._id}
+                                        post={post}
+                                        onClick={() => setSelectedPost(post)}
+                                    />
+                                ))
+                            )
+                        ) : (
+                            <div className="empty-feed">
+                                <p>No posts yet</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <EditProfileModal
+                    isOpen={isEditModalOpen}
+                    profile={profile}
+                    onClose={() => setIsEditModalOpen(false)}
+                    onUpdate={(updatedData) => setProfile(prev => ({ ...prev, ...updatedData }))}
+                />
+                <PostDetailModal
+                    isOpen={!!selectedPost}
+                    post={selectedPost}
+                    onClose={() => setSelectedPost(null)}
+                />
+            </div>
+            <MobileNavbar />
+        </div>
+    );
+};
+
+// Helper component for the Grid View
+const GridItem = ({ post, onClick }) => {
+    const mainMedia = post.media?.[0];
+    const isVideo = mainMedia?.type === 'video';
+
+    return (
+        <div className="grid-item" onClick={onClick}>
+            <div className="grid-media-wrapper">
+                {isVideo ? (
+                    <div className="grid-video-preview">
+                        <img
+                            src={mainMedia.url ? mainMedia.url.replace(/\.[^.]+$/, '.jpg') : 'https://via.placeholder.com/300?text=Video'}
+                            alt=""
+                            onError={(e) => { e.target.src = 'https://via.placeholder.com/300?text=Video'; }}
+                        />
+                        <div className="video-icon-badge">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                                <path d="M8 5v14l11-7z" />
+                            </svg>
+                        </div>
+                    </div>
+                ) : (
+                    <img src={mainMedia?.url || 'https://via.placeholder.com/300'} alt="" />
+                )}
+
+                <div className="grid-overlay">
+                    <div className="overlay-stats">
+                        <div className="stat">
+                            <Heart size={18} fill="white" />
+                            <span>{post.likeCount || 0}</span>
+                        </div>
+                        <div className="stat">
+                            <MessageSquare size={18} fill="white" />
+                            <span>{post.commentCount || 0}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default Profile;

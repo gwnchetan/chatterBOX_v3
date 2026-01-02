@@ -141,6 +141,8 @@
 .input-icon {
     position: absolute;
     left: var(--spacing-lg);
+    top: 50%;
+    transform: translateY(-50%);
     color: var(--color-text-muted);
     display: flex;
     align-items: center;
@@ -158,8 +160,8 @@
 
 .login-input {
     width: 100%;
-    padding: var(--spacing-md) var(--spacing-md) var(--spacing-md) 3.5rem;
-    /* 3.5rem is custom for icon */
+    padding: var(--spacing-md) var(--spacing-md) var(--spacing-md) 4rem !important;
+    /* 4rem !important to ensure text clears the icon */
     background-color: transparent;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-full);

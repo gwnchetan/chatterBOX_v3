@@ -6,7 +6,10 @@ const authMiddleware = require('../middleware/auth.middleware'); // Assuming thi
 // Apply auth middleware to all routes
 router.use(authMiddleware);
 
+// Note: Specific paths first!
 router.get('/signature', postsController.getUploadSignature);
+router.get('/explore', postsController.getExploreFeed);
+router.get('/search', postsController.searchPosts);
 router.post('/', postsController.createPost);
 router.get('/', postsController.getFeed);
 router.delete('/:id', postsController.deletePost);

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Rounded Background: Theme Dark Blue -->
+  <rect width="512" height="512" rx="120" fill="#0f172a"/>
+  
+  <!-- C: Theme White -->
+  <text x="130" y="370" font-family="Arial, sans-serif" font-weight="900" font-size="320" fill="#F5EBFA">C</text>
+  
+  <!-- B: Theme Primary Purple -->
+  <text x="310" y="370" font-family="Arial, sans-serif" font-weight="900" font-size="320" fill="#A56ABD">B</text>
+  
+  <!-- The Cut: Horizontal line matching background color -->
+  <!-- Angled slightly or straight? User image looked straight. -->
+  <rect x="0" y="235" width="512" height="40" fill="#0f172a"/>
+</svg>

@@ -1,0 +1,53 @@
+.app-layout {
+    display: flex;
+    min-height: 100vh;
+    background: var(--color-bg, #000);
+}
+
+.layout-navbar {
+    z-index: 1000;
+}
+
+.layout-content {
+    flex: 1;
+    margin-left: 0;
+    /* Navbar text is usually hidden or takes space, we need to balance this via media queries or JS state if needed. 
+       Usually the Navbar component handles its own width. 
+       We just flex here. 
+    */
+    position: relative;
+    width: 100%;
+}
+
+.layout-mobile-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+}
+
+/* Tablet & Mobile Responsiveness */
+@media (max-width: 1100px) {
+    .app-layout {
+        flex-direction: row;
+    }
+}
+
+@media (max-width: 768px) {
+    .app-layout {
+        flex-direction: column;
+        padding-bottom: 60px;
+        /* Space for mobile nav */
+    }
+
+    .layout-navbar {
+        display: none;
+        /* Hide desktop nav on mobile */
+    }
+
+    .layout-mobile-nav {
+        display: block;
+    }
+}

@@ -246,3 +246,56 @@ exports.getUploadSignature = (req, res) => {
         res.status(500).json({ message: 'Error generating upload signature.' });
     }
 };
+
+/**
+ * Get Explore Feed (Random/Popular posts)
+ * GET /api/posts/explore
+ */
+exports.getExploreFeed = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { limit = 20 } = req.query;
+
+        // Fetch public posts NOT from current user
+        // Using sample for randomness
+        const posts = await Post.aggregate([
+            { $match: { visibility: 'public', isDeleted: false, author: { $ne: userId } } },
+            { $sample: { size: parseInt(limit) } },
+            { $sort: { createdAt: -1 } },
+            { $lookup: { from: 'users', localField: 'author', foreignField: '_id', as: 'author' } },
+            { $unwind: '$author' },
+            { $project: { 'author.password': 0, 'author.email': 0, 'author.blockedUsers': 0 } }
+        ]);
+
+        res.json({ posts });
+    } catch (error) {
+        console.error("Error fetching explore feed:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+/**
+ * Search posts by content (keywords, hashtags)
+ * GET /api/posts/search?q=query
+ */
+exports.searchPosts = async (req, res) => {
+    try {
+        const { q, limit = 20 } = req.query;
+        if (!q) return res.json({ posts: [] });
+
+        // Simple regex search (case-insensitive)
+        const posts = await Post.find({
+            content: { $regex: q, $options: 'i' },
+            visibility: 'public',
+            isDeleted: false
+        })
+            .sort({ createdAt: -1 })
+            .limit(parseInt(limit))
+            .populate('author', 'username fullname avatar');
+
+        res.json({ posts });
+    } catch (error) {
+        console.error("Error searching posts:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};

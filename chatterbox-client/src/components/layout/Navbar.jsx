@@ -39,7 +39,7 @@ const Navbar = () => {
         if (path === '/direct') return 'Direct';
         if (path === '/stats') return 'Stats';
         if (path === '/settings') return 'Settings';
-        if (path === '/profile') return 'Profile';
+        if (path.startsWith('/profile')) return 'Profile';
         if (path === '/create') return 'Create';
         return 'Feed'; // Default
     };
@@ -91,7 +91,7 @@ const Navbar = () => {
             <ul className="nav-menu">
                 <li
                     className={`nav-item ${activeLink === 'Profile' ? 'active' : ''}`}
-                    onClick={() => handleNavigation('/profile')}
+                    onClick={() => handleNavigation(`/profile/${user.id || user._id}`)}
                 >
                     <div className="nav-link">
                         <span className="nav-icon"><User /></span>

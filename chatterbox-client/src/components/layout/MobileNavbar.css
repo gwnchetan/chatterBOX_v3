@@ -47,15 +47,27 @@
 }
 
 .icon-wrapper.center-action {
-    background-color: var(--primary-color);
-    color: white;
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    background-color: var(--color-primary);
+    /* Correct var name */
+    color: white !important;
+    /* Force white icon */
+    width: 44px;
+    /* Slightly larger */
+    height: 44px;
+    border-radius: 14px;
+    box-shadow: 0 4px 12px var(--color-primary-alpha);
+    display: flex;
+    /* Ensure flex */
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2px;
+}
+
+.icon-wrapper.center-action svg {
+    stroke: white;
+    /* Ensure SVG stroke is white */
 }
 
 .mobile-nav-item.active .icon-wrapper.center-action {
-    color: white;
-    /* Keep white even if active class applies color */
+    color: white !important;
 }

@@ -1,0 +1,445 @@
+.profile-layout {
+    display: flex;
+    min-height: 100vh;
+    background-color: var(--color-bg);
+}
+
+.profile-page {
+    flex: 1;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-bottom: 50px;
+}
+
+.profile-header {
+    background: var(--surface-bg, #0b0e11);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 0 0 24px 24px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.profile-banner {
+    height: 200px;
+    width: 100%;
+    position: relative;
+    background: linear-gradient(135deg, #1a1c20 0%, #0b0e11 100%);
+}
+
+.profile-banner img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.banner-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, var(--color-primary, #0095f6) 0%, #001f3f 100%);
+    opacity: 0.4;
+}
+
+.profile-info-container {
+    padding: 0 40px 40px;
+    margin-top: -60px;
+    position: relative;
+    backdrop-filter: blur(10px);
+}
+
+.profile-avatar-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 24px;
+}
+
+.profile-avatar-wrapper {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    border: 6px solid var(--color-bg);
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    background: var(--surface-bg, var(--color-surface));
+}
+
+.profile-avatar {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.btn-edit-profile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 12px;
+    border: none;
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-edit-profile:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+}
+
+.profile-info-text {
+    margin-top: 10px;
+}
+
+.profile-fullname {
+    font-size: 2.5rem;
+    font-weight: 900;
+    margin: 0;
+    letter-spacing: -1px;
+    color: var(--color-text-main);
+    letter-spacing: -1px;
+}
+
+.profile-username {
+    font-size: 1.1rem;
+    color: var(--color-primary, #0095f6);
+    font-weight: 600;
+    margin: 4px 0 20px;
+}
+
+.profile-bio {
+    font-size: 1.05rem;
+    line-height: 1.6;
+    margin-bottom: 24px;
+    max-width: 650px;
+    color: var(--color-text-muted);
+}
+
+.profile-meta {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.meta-item a {
+    color: var(--color-text-main);
+    text-decoration: none;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.profile-stats {
+    display: flex;
+    gap: 48px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.stat-value {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--color-text-main);
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Content Tabs */
+.content-tabs {
+    display: flex;
+    justify-content: center;
+    margin-top: 30px;
+    position: sticky;
+    top: 0;
+    background: var(--surface-bg, var(--color-surface));
+    backdrop-filter: blur(20px);
+    z-index: 100;
+    padding: 0 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tab-btn {
+    padding: 20px 40px;
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    font-weight: 700;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s ease;
+    font-size: 0.85rem;
+    letter-spacing: 1.5px;
+}
+
+.tab-btn.active {
+    color: var(--color-text-main);
+}
+
+.tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 20%;
+    right: 20%;
+    height: 3px;
+    background: var(--color-primary, #0095f6);
+    border-radius: 3px 3px 0 0;
+    box-shadow: 0 -2px 10px var(--color-primary, #0095f6);
+}
+
+.view-toggle {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.toggle-icon {
+    background: rgba(255, 255, 255, 0.03);
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.toggle-icon.active {
+    color: var(--color-text-main);
+    background: var(--color-surface);
+}
+
+/* Profile Feed - NEW GRID */
+.profile-feed {
+    padding: 24px 0;
+}
+
+.profile-feed.grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.grid-item {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1/1;
+    cursor: pointer;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.grid-media-wrapper {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.grid-media-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.grid-item:hover .grid-media-wrapper img {
+    transform: scale(1.05);
+}
+
+.grid-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: opacity 0.2s ease;
+}
+
+.grid-item:hover .grid-overlay {
+    opacity: 1;
+}
+
+.overlay-stats {
+    display: flex;
+    gap: 24px;
+    color: #fff;
+    font-weight: 700;
+}
+
+.overlay-stats .stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.video-icon-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+/* Masonry Layout using CSS Columns */
+.profile-feed.list {
+    display: block;
+    column-count: 3;
+    column-gap: 24px;
+    width: 100%;
+}
+
+.profile-feed.list .feed-item-wrapper {
+    break-inside: avoid;
+    margin-bottom: 24px;
+    /* Ensure content doesn't break mid-card */
+}
+
+/* Respond to screen width */
+@media (max-width: 1024px) {
+    .profile-feed.list {
+        column-count: 2;
+    }
+}
+
+@media (max-width: 600px) {
+    .profile-feed.list {
+        column-count: 1;
+    }
+}
+
+.profile-feed.list .post-card,
+.profile-feed.list .profile-card {
+    height: auto;
+    /* Let card grow naturally */
+    width: 100%;
+}
+
+/* Reset media overrides - let them fill natural width/height */
+.profile-feed.list .post-card .post-slider-wrapper {
+    height: auto !important;
+    aspect-ratio: auto !important;
+}
+
+/* Ensure text cards distribute space */
+.profile-feed.list .profile-card .profile-card-content {
+    /* Remove any forceful centering if we want natural top-down flow */
+    display: block;
+}
+
+.empty-feed {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 120px 0;
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+@media (max-width: 700px) {
+    .profile-page {
+        padding-bottom: 80px;
+        /* Space for MobileNavbar */
+    }
+
+    .profile-header {
+        border-radius: 0;
+    }
+
+    .profile-info-container {
+        padding: 0 20px 30px;
+    }
+
+    .profile-avatar-row {
+        margin-top: -40px;
+    }
+
+    .profile-avatar-wrapper {
+        width: 120px;
+        height: 120px;
+        border-radius: 30px;
+    }
+
+    .profile-fullname {
+        font-size: 1.8rem;
+    }
+
+    .profile-stats {
+        gap: 24px;
+        justify-content: space-between;
+    }
+
+    .profile-feed.grid {
+        gap: 2px;
+    }
+
+    .grid-item {
+        border-radius: 0;
+    }
+
+    .tab-btn {
+        padding: 20px 15px;
+        font-size: 0.75rem;
+    }
+}
+
+
+@media (max-width: 700px) {
+    .profile-info-container {
+        padding: 0 20px 20px;
+    }
+
+    .profile-avatar-row {
+        margin-top: -50px;
+    }
+
+    .profile-avatar-wrapper {
+        width: 100px;
+        height: 100px;
+    }
+
+    .profile-fullname {
+        font-size: 1.5rem;
+    }
+
+    .profile-stats {
+        gap: 20px;
+        justify-content: space-around;
+    }
+
+    .profile-feed.grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 2px;
+    }
+
+    .tab-btn {
+        padding: 15px 10px;
+        font-size: 0.75rem;
+    }
+}

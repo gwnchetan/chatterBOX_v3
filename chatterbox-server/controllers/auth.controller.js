@@ -91,7 +91,8 @@ const loginUser = async (req, res) => {
                 id: user._id,
                 username: user.username,
                 fullname: user.fullname,
-                email: user.email
+                email: user.email,
+                avatar: user.avatar
             }
         });
 
@@ -116,7 +117,7 @@ const googleLogin = async (req, res) => {
 
         console.log("Google UserInfo Response:", googleResponse.data);
 
-        const { name, email, sub: googleId } = googleResponse.data;
+        const { name, email, sub: googleId, picture } = googleResponse.data;
 
         if (!email) {
             return res.status(400).json({ message: "Google account does not have a verified email." });
@@ -126,11 +127,14 @@ const googleLogin = async (req, res) => {
         let user = await User.findOne({ email });
 
         if (user) {
-            // User exists, but might not have googleId linked
             if (!user.googleId) {
                 user.googleId = googleId;
-                await user.save();
             }
+            // Always sync avatar from Google to ensure it's up to date
+            if (picture) {
+                user.avatar = picture;
+            }
+            await user.save();
         } else {
             // 3. Create new user if not exists
             const randomPassword = await bcrypt.hash(Math.random().toString(36).slice(-8), 10);
@@ -145,6 +149,7 @@ const googleLogin = async (req, res) => {
                 username,
                 fullname: name,
                 email,
+                avatar: picture, // Save Google Picture
                 password: randomPassword,
                 googleId
             });
@@ -165,7 +170,8 @@ const googleLogin = async (req, res) => {
                 id: user._id,
                 username: user.username,
                 fullname: user.fullname,
-                email: user.email
+                email: user.email,
+                avatar: user.avatar
             }
         });
 
@@ -268,7 +274,8 @@ const facebookLogin = async (req, res) => {
                 id: user._id,
                 username: user.username,
                 fullname: user.fullname,
-                email: user.email
+                email: user.email,
+                avatar: user.avatar
             }
         });
 

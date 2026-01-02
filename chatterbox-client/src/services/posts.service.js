@@ -32,6 +32,18 @@ export const postsService = {
         return response.data;
     },
 
+    getExplorePosts: async (limit = 20) => {
+        verifyAuth();
+        const response = await api.get(`/posts/explore?limit=${limit}`);
+        return response.data;
+    },
+
+    searchPosts: async (query) => {
+        verifyAuth();
+        const response = await api.get(`/posts/search?q=${query}`);
+        return response.data;
+    },
+
     deletePost: async (postId) => {
         verifyAuth();
         const response = await api.delete(`/posts/${postId}`);

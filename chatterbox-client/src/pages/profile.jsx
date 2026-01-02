@@ -10,6 +10,7 @@ import PostDetailModal from '../components/profile/PostDetailModal';
 import Navbar from '../components/layout/Navbar';
 import MobileNavbar from '../components/layout/MobileNavbar';
 import './profile.css';
+import LogoLoader from '../components/common/LogoLoader';
 
 const Profile = () => {
     const { userId: paramId } = useParams();
@@ -125,7 +126,7 @@ const Profile = () => {
         }
     }, [userId, fetchProfile, fetchPosts]);
 
-    import LogoLoader from '../components/common/LogoLoader';
+
 
     // ...
 

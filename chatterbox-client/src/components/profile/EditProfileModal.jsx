@@ -112,9 +112,9 @@ const EditProfileModal = ({ profile, isOpen, onClose, onUpdate }) => {
                     <div className="avatar-edit-container">
                         <div className="avatar-edit" onClick={() => avatarInputRef.current.click()}>
                             <img
-                                src={avatar || 'https://via.placeholder.com/150'}
+                                src={avatar || '/default-avatar.png'}
                                 alt="avatar"
-                                onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Avatar'; }}
+                                onError={(e) => { e.target.src = '/default-avatar.png'; }}
                             />
                             <div className="camera-overlay"><Camera size={20} /></div>
                             <input

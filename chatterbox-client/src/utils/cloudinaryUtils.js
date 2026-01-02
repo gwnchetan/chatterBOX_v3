@@ -5,7 +5,11 @@
 
 // TODO: Move this to an environment variable or config context if possible
 // For now, we assume standard Cloudinary URL structure
-const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'demo';
+const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+
+if (!CLOUD_NAME) {
+    console.warn("Cloudinary Cloud Name is missing! Videos will fail to load. Please set VITE_CLOUDINARY_CLOUD_NAME.");
+}
 
 /**
  * Constructs the final streaming URL from normalized metadata.
@@ -20,6 +24,9 @@ const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'demo';
  */
 export const buildVideoUrl = (video, originalWidth, originalHeight, format = 'mp4') => {
     if (!video || !video.publicId) return '';
+
+    // If no cloud name, return empty to prevent 404 spam (or return raw if absolute?)
+    if (!CLOUD_NAME) return '';
 
     // Defaults
     const trimStart = video.trim?.start || 0;
@@ -78,8 +85,9 @@ export const buildVideoUrl = (video, originalWidth, originalHeight, format = 'mp
     }
 
     // 3. Final Asset
-    url += `/${video.publicId}.${format}`;
+    url += `/${video.publicId}.${format}`; // Ensure clean joining
 
+    // Remove double dots if format is empty or publicId has extension (rare)
     return url;
 };
 

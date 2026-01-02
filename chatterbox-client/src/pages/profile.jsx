@@ -166,9 +166,10 @@ const Profile = () => {
                         <div className="profile-avatar-row">
                             <div className="profile-avatar-wrapper">
                                 <img
-                                    src={profile.avatar || 'https://via.placeholder.com/150'}
+                                    src={profile.avatar || '/default-avatar.png'}
                                     alt={profile.username}
                                     className="profile-avatar"
+                                    onError={(e) => { e.target.src = '/default-avatar.png'; }}
                                 />
                             </div>
                             <div className="profile-actions">
@@ -330,9 +331,9 @@ const GridItem = ({ post, onClick }) => {
                 {isVideo ? (
                     <div className="grid-video-preview">
                         <img
-                            src={mainMedia.url ? mainMedia.url.replace(/\.[^.]+$/, '.jpg') : 'https://via.placeholder.com/300?text=Video'}
+                            src={mainMedia.url ? mainMedia.url.replace(/\.[^.]+$/, '.jpg') : '/default-placeholder.png'}
                             alt=""
-                            onError={(e) => { e.target.src = 'https://via.placeholder.com/300?text=Video'; }}
+                            onError={(e) => { e.target.src = '/default-placeholder.png'; }} // Use local placeholder
                         />
                         <div className="video-icon-badge">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
@@ -341,7 +342,7 @@ const GridItem = ({ post, onClick }) => {
                         </div>
                     </div>
                 ) : (
-                    <img src={mainMedia?.url || 'https://via.placeholder.com/300'} alt="" />
+                    <img src={mainMedia?.url || '/default-placeholder.png'} alt="" onError={(e) => { e.target.src = '/default-placeholder.png'; }} />
                 )}
 
                 <div className="grid-overlay">

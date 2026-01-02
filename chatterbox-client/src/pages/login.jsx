@@ -102,36 +102,34 @@ function Login() {
     const [isLoading, setIsLoading] = useState(false);
     const { success, error } = useToast();
 
+    import api from '../services/api';
+
+    // ... imports ...
+
+    // ... inside Login component ...
+
     const googleLogin = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
             console.log("Google Popup Success, Token:", tokenResponse);
             try {
                 setIsLoading(true);
-                const res = await fetch('http://localhost:5000/api/auth/google', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ token: tokenResponse.access_token }),
+                // Use api service instead of fetch
+                const res = await api.post('/auth/google', {
+                    token: tokenResponse.access_token
                 });
 
-                const data = await res.json();
-
-                if (!res.ok) {
-                    throw new Error(data.message || 'Google Login Failed');
-                }
+                const data = res.data;
 
                 success("Google Login Successful!");
                 localStorage.setItem('token', data.token);
-                localStorage.setItem('user', JSON.stringify(data.user));
+                localStorage.setItem('user', JSON.stringify(data.user)); // Fixed: data.user instead of res.data.user
                 console.log("Navigating to feed...");
-                // Force navigation if react-router is stuck
                 navigate('/feed');
-                // Backup: window.location.href = '/feed';
 
             } catch (err) {
                 console.error("Google Auth Backend Error:", err);
-                error(err.message || "Google Login Failed on Server");
+                const errorMessage = err.response?.data?.message || err.message || "Google Login Failed";
+                error(errorMessage);
             } finally {
                 setIsLoading(false);
             }
@@ -153,9 +151,7 @@ function Login() {
 
         setIsLoading(true);
 
-        const endpoint = isRegister
-            ? 'http://localhost:5000/api/auth/register'
-            : 'http://localhost:5000/api/auth/login';
+        const endpoint = isRegister ? '/auth/register' : '/auth/login';
 
         const payload = isRegister
             ? {
@@ -170,20 +166,9 @@ function Login() {
             };
 
         try {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                // Handle specific backend errors
-                throw new Error(data.message || 'Something went wrong');
-            }
+            // Use api service instead of fetch
+            const response = await api.post(endpoint, payload);
+            const data = response.data;
 
             // Success
             success(isRegister ? "Registration Successful! Please Login." : "Login Successful!");
@@ -192,7 +177,6 @@ function Login() {
                 // Save token and user data
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('user', JSON.stringify(data.user));
-                // Here you would typically navigate to the dashboard
                 navigate('/feed');
             } else {
                 // If registered, maybe switch to login view automatically
@@ -202,7 +186,8 @@ function Login() {
 
         } catch (err) {
             console.error("Auth Error:", err);
-            error(err.message);
+            const errorMessage = err.response?.data?.message || err.message || "Something went wrong";
+            error(errorMessage);
         } finally {
             setIsLoading(false);
         }

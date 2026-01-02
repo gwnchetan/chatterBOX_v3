@@ -15,7 +15,13 @@ app.use(compression()); // Compress all routes
 app.use(cors());
 app.use(express.json());
 
-// ...
+const authRoutes = require('./routes/auth.routes');
+const postsRoutes = require('./routes/posts.routes');
+const userRoutes = require('./routes/user.routes');
+
+app.use('/api/auth', authRoutes);
+app.use('/api/posts', postsRoutes);
+app.use('/api/users', userRoutes);
 
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {

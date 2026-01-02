@@ -26,7 +26,8 @@ if (process.env.NODE_ENV === 'production') {
   // Set static folder
   app.use(express.static(path.join(__dirname, '../chatterbox-client/dist')));
 
-  app.get('*', (req, res) => {
+  // Express 5 requires regex or named parameter for wildcards
+  app.get(/.*/, (req, res) => {
     res.sendFile(path.resolve(__dirname, '../chatterbox-client', 'dist', 'index.html'));
   });
 } else {

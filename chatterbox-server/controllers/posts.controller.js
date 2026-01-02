@@ -235,6 +235,10 @@ exports.getUploadSignature = (req, res) => {
 
         const signature = generateSignature(paramsToSign);
 
+        // Debug Log
+        console.log("Generating Signature. Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME ? "Found" : "Missing");
+        console.log("API Key:", process.env.CLOUDINARY_API_KEY ? "Found" : "Missing");
+
         res.json({
             signature,
             timestamp,

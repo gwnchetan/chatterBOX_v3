@@ -125,8 +125,16 @@ const Profile = () => {
         }
     }, [userId, fetchProfile, fetchPosts]);
 
-    if (loading && !profile) {
-        return <div className="profile-loading">Loading Profile...</div>;
+    import LogoLoader from '../components/common/LogoLoader';
+
+    // ...
+
+    if (loading) {
+        return (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+                <LogoLoader size="3rem" text="Gathering profile..." />
+            </div>
+        );
     }
 
     if (!profile) {

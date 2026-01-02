@@ -1,6 +1,15 @@
+const express = require('express');
+const cors = require('cors');
 const compression = require('compression');
+const ConnectDB = require('./db');
+require('dotenv').config();
 
-// ...
+ConnectDB();
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+const path = require('path');
 
 app.use(compression()); // Compress all routes
 app.use(cors());

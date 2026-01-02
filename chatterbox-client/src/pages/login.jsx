@@ -6,6 +6,7 @@ import LogoLoader from '../components/common/LogoLoader';
 import { useGoogleLogin } from '@react-oauth/google';
 import loginIllustration from '../assets/login.png';
 import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
 
 function Login() {
     const navigate = useNavigate();
@@ -101,12 +102,6 @@ function Login() {
 
     const [isLoading, setIsLoading] = useState(false);
     const { success, error } = useToast();
-
-    import api from '../services/api';
-
-    // ... imports ...
-
-    // ... inside Login component ...
 
     const googleLogin = useGoogleLogin({
         onSuccess: async (tokenResponse) => {

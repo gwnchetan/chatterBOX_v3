@@ -54,5 +54,29 @@ export const postsService = {
         verifyAuth();
         const response = await api.get('/posts/signature');
         return response.data;
+    },
+
+    toggleLike: async (postId) => {
+        verifyAuth();
+        const response = await api.post(`/posts/${postId}/like`);
+        return response.data;
+    },
+
+    repost: async (postId) => {
+        verifyAuth();
+        const response = await api.post(`/posts/${postId}/repost`);
+        return response.data;
+    },
+
+    addComment: async (postId, content) => {
+        verifyAuth();
+        const response = await api.post(`/posts/${postId}/comment`, { content });
+        return response.data;
+    },
+
+    getComments: async (postId) => {
+        verifyAuth();
+        const response = await api.get(`/posts/${postId}/comments`);
+        return response.data;
     }
 };

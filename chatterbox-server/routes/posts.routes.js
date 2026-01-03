@@ -14,4 +14,10 @@ router.post('/', postsController.createPost);
 router.get('/', postsController.getFeed);
 router.delete('/:id', postsController.deletePost);
 
+// Interactions
+router.post('/:id/like', postsController.toggleLike);
+router.post('/:id/repost', postsController.repost);
+router.post('/:id/comment', postsController.addComment);
+router.get('/:id/comments', postsController.getComments);
+
 module.exports = router;

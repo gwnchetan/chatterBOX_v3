@@ -57,6 +57,14 @@ const postSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    repostOf: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Post'
+    },
+    repostCount: {
+        type: Number,
+        default: 0
+    },
     engagementScore: {
         type: Number,
         default: 0

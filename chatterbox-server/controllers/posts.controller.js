@@ -1,5 +1,7 @@
 const Post = require('../models/posts');
 const User = require('../models/users');
+const Like = require('../models/likes');
+const Comment = require('../models/comments');
 const { deleteMedia, generateSignature } = require('../utils/cloudinary');
 
 // Simple in-memory rate limiter per instance (Temporary)
@@ -183,7 +185,11 @@ exports.getFeed = async (req, res) => {
         const posts = await Post.find(query)
             .sort({ createdAt: -1, _id: -1 })
             .limit(fetchLimit)
-            .populate('author', 'username fullname avatar'); // Populate author details
+            .populate('author', 'username fullname avatar') // Populate author details
+            .populate({
+                path: 'repostOf',
+                populate: { path: 'author', select: 'username fullname avatar' }
+            });
 
         const validPosts = [];
         const followingStr = currentUser.following.map(id => id.toString());
@@ -215,8 +221,19 @@ exports.getFeed = async (req, res) => {
         // If we exhausted fetched posts but still have more in DB, cursor logic holds true 
         // because we sort by createdAt. 
 
+        // 5. Hydrate with "isLiked" status
+        // Efficiently find which of these posts the user has liked
+        const postIds = validPosts.map(p => p._id);
+        const userLikes = await Like.find({ post: { $in: postIds }, user: userId }).select('post');
+        const likedPostIds = new Set(userLikes.map(l => l.post.toString()));
+
+        const hydratedPosts = validPosts.map(post => ({
+            ...post.toObject(),
+            isLiked: likedPostIds.has(post._id.toString())
+        }));
+
         res.json({
-            posts: validPosts,
+            posts: hydratedPosts,
             nextCursor: posts.length > validPosts.length ? nextCursor : (posts.length < fetchLimit ? null : nextCursor)
         });
 
@@ -301,5 +318,125 @@ exports.searchPosts = async (req, res) => {
     } catch (error) {
         console.error("Error searching posts:", error);
         res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+/**
+ * Toggle Like
+ * POST /api/posts/:id/like
+ */
+exports.toggleLike = async (req, res) => {
+    try {
+        const postId = req.params.id;
+        const userId = req.user._id;
+
+        const post = await Post.findById(postId);
+        if (!post) return res.status(404).json({ message: 'Post not found' });
+
+        const existingLike = await Like.findOne({ post: postId, user: userId });
+
+        if (existingLike) {
+            // Unlike
+            await Like.deleteOne({ _id: existingLike._id });
+            await Post.findByIdAndUpdate(postId, { $inc: { likeCount: -1 } });
+            return res.json({ message: 'Post unliked', liked: false, likeCount: post.likeCount - 1 });
+        } else {
+            // Like
+            const newLike = new Like({ post: postId, user: userId });
+            await newLike.save();
+            await Post.findByIdAndUpdate(postId, { $inc: { likeCount: 1 } });
+            return res.json({ message: 'Post liked', liked: true, likeCount: post.likeCount + 1 });
+        }
+    } catch (error) {
+        console.error('Error toggling like:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+/**
+ * Add Comment
+ * POST /api/posts/:id/comment
+ */
+exports.addComment = async (req, res) => {
+    try {
+        const postId = req.params.id;
+        const userId = req.user._id;
+        const { content } = req.body;
+
+        if (!content || !content.trim()) {
+            return res.status(400).json({ message: 'Comment cannot be empty' });
+        }
+
+        const post = await Post.findById(postId);
+        if (!post) return res.status(404).json({ message: 'Post not found' });
+
+        const newComment = new Comment({
+            post: postId,
+            user: userId,
+            content
+        });
+        await newComment.save();
+
+        await Post.findByIdAndUpdate(postId, { $inc: { commentCount: 1 } });
+
+        // Build response with author info for immediate UI update
+        const fullComment = await Comment.findById(newComment._id).populate('user', 'username fullname avatar');
+
+        res.status(201).json(fullComment);
+    } catch (error) {
+        console.error('Error adding comment:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+/**
+ * Get Comments
+ * GET /api/posts/:id/comments
+ */
+exports.getComments = async (req, res) => {
+    try {
+        const postId = req.params.id;
+        const comments = await Comment.find({ post: postId })
+            .sort({ createdAt: 1 }) // Oldest first (Thread style)
+            .populate('user', 'username fullname avatar');
+
+        res.json(comments);
+    } catch (error) {
+        console.error('Error fetching comments:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+/**
+ * Repost
+ * POST /api/posts/:id/repost
+ */
+exports.repost = async (req, res) => {
+    try {
+        const originalPostId = req.params.id;
+        const userId = req.user._id;
+
+        const originalPost = await Post.findById(originalPostId);
+        if (!originalPost) return res.status(404).json({ message: 'Post not found' });
+
+        // Check if already reposted? (Optional, skipping for "basic")
+        // Create Repost
+        const newPost = new Post({
+            author: userId,
+            repostOf: originalPostId,
+            visibility: 'public', // Default to public for now
+            createdAt: new Date()
+        });
+
+        await newPost.save();
+
+        // Update original post count
+        await Post.findByIdAndUpdate(originalPostId, { $inc: { repostCount: 1 } });
+
+        res.status(201).json({ message: 'Reposted successfully', post: newPost });
+
+    } catch (error) {
+        console.error('Error reposting:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };

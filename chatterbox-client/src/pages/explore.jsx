@@ -7,6 +7,9 @@ import PostCard from '../components/feed/PostCard'; // We can reuse standard car
 import Avatar from '../components/common/Avatar';
 import { Search } from '../components/common/Icons';
 import { useNavigate } from 'react-router-dom';
+import RightSidebar from '../components/layout/RightSidebar';
+import { useFeed } from '../context/FeedContext';
+
 import './explore.css';
 
 const Explore = () => {
@@ -16,6 +19,7 @@ const Explore = () => {
     const [loading, setLoading] = useState(true);
     const [searching, setSearching] = useState(false);
     const navigate = useNavigate();
+    const { mergePosts } = useFeed();
 
     useEffect(() => {
         loadExploreFeed();
@@ -25,6 +29,7 @@ const Explore = () => {
         try {
             setLoading(true);
             const data = await postsService.getExplorePosts();
+            mergePosts(data.posts || []);
             setPosts(data.posts || []);
         } catch (error) {
             console.error('Error loading explore feed:', error);
@@ -33,7 +38,6 @@ const Explore = () => {
         }
     };
 
-    // Debounce search could be added here, currently simple async
     const handleSearch = async (e) => {
         const query = e.target.value;
         setSearchQuery(query);
@@ -48,6 +52,7 @@ const Explore = () => {
                 ]);
 
                 setSearchResultsUsers(userData.users || []);
+                mergePosts(postData.posts || []);
                 setPosts(postData.posts || []); // Update main grid with search results
             } catch (error) {
                 console.error("Search error:", error);
@@ -68,60 +73,65 @@ const Explore = () => {
     return (
         <div className="explore-layout">
             <Navbar />
-            <div className="explore-page">
-                {/* Search Header */}
-                <div className="explore-header">
-                    <div className="search-bar-wrapper">
-                        <Search size={18} className="search-icon" />
-                        <input
-                            type="text"
-                            className="search-input"
-                            placeholder="Search users, posts, or tags..."
-                            value={searchQuery}
-                            onChange={handleSearch}
-                        />
-                    </div>
-                </div>
 
-                {/* User Search Results Section */}
-                {searchQuery && searchResultsUsers.length > 0 && (
-                    <div className="search-section users-section">
-                        <h3 className="section-title">People</h3>
-                        <div className="search-results-container">
-                            {searchResultsUsers.map(user => (
-                                <div key={user._id} className="search-result-item" onClick={() => handleUserClick(user._id)}>
-                                    <Avatar src={user.avatar} size="sm" alt={user.fullname} />
-                                    <div className="result-info">
-                                        <span className="result-fullname">{user.fullname}</span>
-                                        <span className="result-username">@{user.username}</span>
+            <main className="explore-center">
+                <div className="explore-content-container">
+                    {/* Search Header */}
+                    <div className="explore-header">
+                        <div className="search-bar-wrapper">
+                            <Search size={18} className="search-icon" />
+                            <input
+                                type="text"
+                                className="search-input"
+                                placeholder="Search users, posts, or tags..."
+                                value={searchQuery}
+                                onChange={handleSearch}
+                            />
+                        </div>
+                    </div>
+
+                    {/* User Search Results Section */}
+                    {searchQuery && searchResultsUsers.length > 0 && (
+                        <div className="search-section users-section">
+                            <h3 className="section-title">People</h3>
+                            <div className="search-results-container">
+                                {searchResultsUsers.map(user => (
+                                    <div key={user._id} className="search-result-item" onClick={() => handleUserClick(user._id)}>
+                                        <Avatar src={user.avatar} size="sm" alt={user.fullname} />
+                                        <div className="result-info">
+                                            <span className="result-fullname">{user.fullname}</span>
+                                            <span className="result-username">@{user.username}</span>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Main Content Grid (Explore Feed OR Post Search Results) */}
-                <div className="explore-grid">
-                    {searchQuery && <h3 className="section-title">Posts</h3>}
-
-                    {loading || searching ? (
-                        <div className="explore-loading">Loading...</div>
-                    ) : posts.length > 0 ? (
-                        <div className="masonry-grid">
-                            {posts.map(post => (
-                                <div key={post._id} className="masonry-item">
-                                    <PostCard post={post} />
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="no-results">
-                            {searchQuery ? "No posts found matching your search." : "No explore posts available."}
+                                ))}
+                            </div>
                         </div>
                     )}
+
+                    {/* Main Content Grid (Explore Feed OR Post Search Results) */}
+                    <div className="explore-grid">
+                        {searchQuery && <h3 className="section-title">Posts</h3>}
+
+                        {loading || searching ? (
+                            <div className="explore-loading">Loading...</div>
+                        ) : posts.length > 0 ? (
+                            <div className="masonry-grid">
+                                {posts.map(post => (
+                                    <div key={post._id} className="masonry-item">
+                                        <PostCard post={post} />
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="no-results">
+                                {searchQuery ? "No posts found matching your search." : "No explore posts available."}
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
+            </main>
+
+            <RightSidebar />
             <MobileNavbar />
         </div>
     );

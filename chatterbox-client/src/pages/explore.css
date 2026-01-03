@@ -1,39 +1,114 @@
+/* Standard Edge-to-Edge Layout */
 .explore-layout {
-    display: flex;
+    display: grid;
+    grid-template-columns: 280px 1fr 350px;
     min-height: 100vh;
     background-color: var(--color-bg);
     width: 100%;
+    margin: 0;
+    padding: 0;
+    gap: 0;
 }
 
-.explore-page {
-    flex: 1;
+/* Center Column */
+.explore-center {
+    grid-column: 2;
     width: 100%;
-    max-width: 1000px;
+    max-width: 900px;
     margin: 0 auto;
-    padding: 20px 40px;
-    padding-bottom: 20px;
-    min-width: 0;
-    /* Critical for flex child */
+    border-left: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+}
+
+.explore-content-container {
+    padding: 0;
+    width: 100%;
+}
+
+/* Sidebars */
+.explore-layout .navbar {
+    grid-column: 1;
+    width: 100% !important;
+    height: 100vh;
+    position: sticky !important;
+    top: 0;
+    left: 0 !important;
+    border-radius: 0;
+    background: var(--color-bg);
+    border-right: 1px solid var(--color-border);
+    z-index: 50;
+    padding: 1.5rem 1rem;
+    overflow-y: auto;
+}
+
+.explore-layout .sidebar-right {
+    grid-column: 3;
+    width: 100%;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    right: 0;
+    background: var(--color-bg);
+    border-left: 1px solid var(--color-border);
+    z-index: 40;
+    padding: 20px 24px;
+    overflow-y: auto;
+}
+
+/* Responsive Grid */
+@media (max-width: 1300px) {
+    .explore-layout {
+        grid-template-columns: 280px 1fr;
+    }
+
+    .explore-layout .sidebar-right {
+        display: none;
+    }
+
+    .explore-center {
+        border-right: none;
+    }
+}
+
+@media (max-width: 900px) {
+    .explore-layout {
+        grid-template-columns: 88px 1fr;
+    }
+
+    .explore-layout .navbar {
+        padding: 1.5rem 0.5rem;
+        align-items: center;
+    }
 }
 
 @media (max-width: 700px) {
-    .explore-page {
-        padding: 16px;
+    .explore-layout {
+        display: block;
+    }
+
+    .explore-layout .navbar {
+        display: none;
+    }
+
+    .explore-center {
+        border: none;
         padding-bottom: 80px;
-        /* Space for MobileNavbar */
     }
 }
 
 /* Search Header */
 .explore-header {
-    margin-bottom: 24px;
     position: sticky;
-    top: 20px;
-    z-index: 50;
-    max-width: 600px;
-    /*Keep search bar centered and not too wide*/
-    margin-left: auto;
-    margin-right: auto;
+    top: 0;
+    z-index: 45;
+    background: rgba(0, 0, 0, 0.85);
+    /* Glass effect */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--color-border);
+    padding: 12px 20px;
 }
 
 .search-bar-wrapper {
@@ -42,15 +117,14 @@
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: 9999px;
-    /* Pill shape */
-    padding: 12px 20px;
-    box-shadow: var(--shadow-sm);
+    padding: 10px 20px;
     transition: all 0.2s;
+    max-width: 100%;
 }
 
 .search-bar-wrapper:focus-within {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px var(--color-primary-alpha);
+    box-shadow: 0 0 0 1px var(--color-primary);
 }
 
 .search-icon {
@@ -64,98 +138,91 @@
     outline: none;
     flex: 1;
     color: var(--color-text-main);
-    font-size: 1.1rem;
-    /* Readable font size */
+    font-size: 1rem;
 }
 
 .search-input::placeholder {
     color: var(--color-text-muted);
-    opacity: 0.7;
+}
+
+/* Sections */
+.search-section {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--color-border);
 }
 
 .section-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--color-text-main);
+    font-size: 1.2rem;
+    font-weight: 800;
     margin-bottom: 16px;
-    margin-top: 16px;
-    padding-left: 8px;
+    color: var(--color-text-main);
 }
 
-/* Results */
+/* User Results */
 .search-results-container {
-    background: var(--color-surface);
-    border-radius: 12px;
-    margin-bottom: 24px;
-    overflow: hidden;
-    box-shadow: var(--shadow-lg);
-    border: 1px solid var(--color-border);
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 .search-result-item {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 20px;
+    padding: 12px;
+    border-radius: 8px;
     cursor: pointer;
     transition: background-color 0.2s;
-    border-bottom: 1px solid var(--color-border);
-}
-
-.search-result-item:last-child {
-    border-bottom: none;
 }
 
 .search-result-item:hover {
     background-color: rgba(255, 255, 255, 0.05);
 }
 
-.result-info {
-    display: flex;
-    flex-direction: column;
-}
-
 .result-fullname {
-    font-weight: 600;
-    color: var(--color-text-main);
+    font-weight: 700;
+    display: block;
 }
 
 .result-username {
-    font-size: 0.85rem;
     color: var(--color-text-muted);
+    font-size: 0.9rem;
 }
 
-.search-loading,
-.no-results {
-    padding: 20px;
-    text-align: center;
-    color: var(--color-text-muted);
+/* Masonry Grid (Posts) */
+.explore-grid {
+    padding: 0;
+    /* Let masonry handle spacing if needed, or add padding here */
 }
 
-/* Masonry Grid for Feed */
+/* Masonry inside Center Column */
 .masonry-grid {
-    column-count: 3;
-    column-gap: 24px;
-    width: 100%;
+    column-count: 2;
+    /* 2 columns looks good in center feed usually */
+    column-gap: 16px;
+    padding: 16px;
 }
 
 .masonry-item {
     break-inside: avoid;
-    margin-bottom: 24px;
+    margin-bottom: 16px;
 }
 
-/* Adjust Masonry Columns */
-@media (max-width: 1024px) {
-    .masonry-grid {
-        column-count: 2;
-    }
-}
+/* If single column preferred */
+/* .masonry-grid {
+    display: flex;
+    flex-direction: column;
+} */
 
-@media (max-width: 600px) {
+@media (max-width: 500px) {
     .masonry-grid {
         column-count: 1;
+        /* Stack on very small screens */
     }
+}
+
+.explore-loading,
+.no-results {
+    padding: 40px;
+    text-align: center;
+    color: var(--color-text-muted);
 }

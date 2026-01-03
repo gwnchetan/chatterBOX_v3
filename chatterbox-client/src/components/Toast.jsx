@@ -23,13 +23,17 @@ export const ToastProvider = ({ children }) => {
         setToasts((prev) => [...prev, { id, type, message, duration }]);
     }, []);
 
-    const success = (message, duration) => addToast('success', message, duration);
-    const error = (message, duration) => addToast('error', message, duration);
-    const warning = (message, duration) => addToast('warning', message, duration);
-    const info = (message, duration) => addToast('info', message, duration);
+    const success = useCallback((message, duration) => addToast('success', message, duration), [addToast]);
+    const error = useCallback((message, duration) => addToast('error', message, duration), [addToast]);
+    const warning = useCallback((message, duration) => addToast('warning', message, duration), [addToast]);
+    const info = useCallback((message, duration) => addToast('info', message, duration), [addToast]);
+
+    const contextValue = React.useMemo(() => ({
+        addToast, removeToast, success, error, warning, info
+    }), [addToast, removeToast, success, error, warning, info]);
 
     return (
-        <ToastContext.Provider value={{ addToast, removeToast, success, error, warning, info }}>
+        <ToastContext.Provider value={contextValue}>
             {children}
             <div className="toast-container">
                 {toasts.map((toast) => (

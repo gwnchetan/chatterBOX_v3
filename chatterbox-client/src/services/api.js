@@ -10,6 +10,7 @@ const api = axios.create({
 });
 
 // Request interceptor to add auth token
+// Request interceptor to add auth token
 api.interceptors.request.use(
     (config) => {
         const user = JSON.parse(localStorage.getItem('user'));
@@ -21,6 +22,24 @@ api.interceptors.request.use(
         return config;
     },
     (error) => {
+        return Promise.reject(error);
+    }
+);
+
+// Response interceptor to handle 401s
+api.interceptors.response.use(
+    (response) => {
+        return response;
+    },
+    async (error) => {
+        if (error.response?.status === 401) {
+            localStorage.removeItem('user');
+            localStorage.removeItem('token');
+            // Only redirect if not already at login
+            if (window.location.pathname !== '/' && !window.location.pathname.includes('/login')) {
+                window.location.href = '/';
+            }
+        }
         return Promise.reject(error);
     }
 );

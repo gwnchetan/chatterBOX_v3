@@ -79,7 +79,7 @@ const loginUser = async (req, res) => {
         // Use a default secret if not provided in .env (for dev safety, though .env is better)
         const token = jwt.sign(
             { id: user._id, username: user.username },
-            process.env.JWT_SECRET || "default_secret_key",
+            process.env.JWT_SECRET || "chatterbox_secret_key_2024",
             { expiresIn: "1d" }
         );
 
@@ -159,7 +159,7 @@ const googleLogin = async (req, res) => {
         // 4. Generate Token
         const token = jwt.sign(
             { id: user._id, username: user.username },
-            process.env.JWT_SECRET || "default_secret_key",
+            process.env.JWT_SECRET || "chatterbox_secret_key_2024",
             { expiresIn: "1d" }
         );
 
@@ -263,7 +263,7 @@ const facebookLogin = async (req, res) => {
         // 5. Generate Internal JWT
         const token = jwt.sign(
             { id: user._id, username: user.username },
-            process.env.JWT_SECRET || "default_secret_key",
+            process.env.JWT_SECRET || "chatterbox_secret_key_2024",
             { expiresIn: "1d" }
         );
 

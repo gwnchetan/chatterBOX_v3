@@ -6,7 +6,16 @@ require('dotenv').config();
 
 ConnectDB();
 
+const http = require('http');
+const { initSocket } = require('./socket');
+
 const app = express();
+const server = http.createServer(app);
+
+// Initialize Socket.io
+const io = initSocket(server);
+app.set('io', io);
+
 const PORT = process.env.PORT || 5000;
 
 const path = require('path');
@@ -41,6 +50,6 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

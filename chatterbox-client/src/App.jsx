@@ -12,52 +12,56 @@ import ProtectedRoute from './components/common/ProtectedRoute';
 
 
 
+import { FeedProvider } from './context/FeedContext';
+
 function App() {
   return (
     <div className="app-container">
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/feed" element={
-          <ProtectedRoute>
-            <Feed />
-          </ProtectedRoute>
-        } />
-        <Route path="/create" element={
-          <ProtectedRoute>
-            <CreatePost />
-          </ProtectedRoute>
-        } />
-        <Route path="/profile/:userId" element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        } />
-        <Route path="/profile" element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        } />
-        <Route path="/explore" element={
-          <ProtectedRoute>
-            <Explore />
-          </ProtectedRoute>
-        } />
-        <Route path="/favorites" element={
-          <ProtectedRoute>
-            <Favorites />
-          </ProtectedRoute>
-        } />
-        <Route path="/direct" element={
-          <ProtectedRoute>
-            <WIP title="Direct Messages" />
-          </ProtectedRoute>
-        } />
-        <Route path="/stats" element={
-          <ProtectedRoute>
-            <WIP title="Statistics" />
-          </ProtectedRoute>
-        } />
-      </Routes>
+      <FeedProvider>
+        <Routes>
+          <Route path="/" element={<Login />} />
+          <Route path="/feed" element={
+            <ProtectedRoute>
+              <Feed />
+            </ProtectedRoute>
+          } />
+          <Route path="/create" element={
+            <ProtectedRoute>
+              <CreatePost />
+            </ProtectedRoute>
+          } />
+          <Route path="/profile/:userId" element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          } />
+          <Route path="/explore" element={
+            <ProtectedRoute>
+              <Explore />
+            </ProtectedRoute>
+          } />
+          <Route path="/favorites" element={
+            <ProtectedRoute>
+              <Favorites />
+            </ProtectedRoute>
+          } />
+          <Route path="/direct" element={
+            <ProtectedRoute>
+              <WIP title="Direct Messages" />
+            </ProtectedRoute>
+          } />
+          <Route path="/stats" element={
+            <ProtectedRoute>
+              <WIP title="Statistics" />
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </FeedProvider>
     </div>
   )
 }

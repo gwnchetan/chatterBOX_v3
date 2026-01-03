@@ -13,7 +13,7 @@ const authMiddleware = async (req, res, next) => {
             return res.status(401).json({ message: 'Token missing.' });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_key'); // Backup secret just in case
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'chatterbox_secret_key_2024'); // Match controller secret
         const user = await User.findById(decoded.userId || decoded.id);
 
         if (!user) {

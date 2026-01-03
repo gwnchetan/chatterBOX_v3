@@ -7,25 +7,35 @@ import MobileNavbar from '../components/layout/MobileNavbar';
 import { postsService } from '../services/posts.service';
 import { useToast } from '../components/Toast';
 import LogoLoader from '../components/common/LogoLoader';
+import PostSkeleton from '../components/feed/PostSkeleton';
+import { Virtuoso } from 'react-virtuoso';
+import { useFeed } from '../context/FeedContext';
 
 const Feed = () => {
-    const [posts, setPosts] = useState([]);
+    const [postIds, setPostIds] = useState([]);
     const [cursor, setCursor] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
+    const [error, setError] = useState(null);
     const observer = useRef();
     const toast = useToast();
+    const { posts: allPosts, mergePosts } = useFeed();
 
     const fetchFeed = useCallback(async (currentCursor = null, isRefresh = false) => {
         if (isLoading) return;
         setIsLoading(true);
+        setError(null);
         try {
             const data = await postsService.getFeed(currentCursor);
 
+            // Merge full objects into global store
+            mergePosts(data.posts);
+
+            // Keep track of order locally with IDs
             if (isRefresh) {
-                setPosts(data.posts);
+                setPostIds(data.posts.map(p => p._id));
             } else {
-                setPosts(prev => [...prev, ...data.posts]);
+                setPostIds(prev => [...prev, ...data.posts.map(p => p._id)]);
             }
 
             setCursor(data.nextCursor);
@@ -33,32 +43,19 @@ const Feed = () => {
 
         } catch (error) {
             console.error('Failed to fetch feed:', error);
+            setError(error.response?.data?.message || 'Failed to load feed.');
             if (isRefresh) toast.error('Failed to load feed.');
         } finally {
             setIsLoading(false);
         }
-    }, [isLoading]);
+    }, [isLoading, toast, mergePosts]);
 
     // Initial Load
     useEffect(() => {
         fetchFeed(null, true);
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Infinite Scroll Logic
-    const lastPostElementRef = useCallback(node => {
-        if (isLoading) return;
-        if (observer.current) observer.current.disconnect();
 
-        observer.current = new IntersectionObserver(entries => {
-            if (entries[0].isIntersecting && hasMore) {
-                if (cursor) {
-                    fetchFeed(cursor);
-                }
-            }
-        });
-
-        if (node) observer.current.observe(node);
-    }, [isLoading, hasMore, cursor, fetchFeed]);
 
     // Listener for Background Uploads
     useEffect(() => {
@@ -72,7 +69,7 @@ const Feed = () => {
 
         window.addEventListener('post-created', handleNewPost);
         return () => window.removeEventListener('post-created', handleNewPost);
-    }, []);
+    }, [mergePosts]); // Added mergePosts dep
 
     const handlePostCreated = (newPost) => {
         const user = JSON.parse(localStorage.getItem('user'));
@@ -83,10 +80,28 @@ const Feed = () => {
                 fullname: user.fullname,
                 username: user.username,
                 avatar: user.avatar
-            }
+            },
+            // Default interactive state
+            likeCount: 0,
+            commentCount: 0,
+            repostCount: 0,
+            liked: false,
+            reposted: false,
+            saved: false
         };
-        setPosts(prev => [postWithAuthor, ...prev]);
+
+        // Merge & Prepend ID
+        mergePosts([postWithAuthor]);
+        setPostIds(prev => [postWithAuthor._id || postWithAuthor.id, ...prev]);
     };
+
+    const handleDeletePost = (deletedPostId) => {
+        setPostIds(prev => prev.filter(id => id !== deletedPostId));
+        toast.success("Post deleted");
+    };
+
+    // Resolve IDs to full objects
+    const visiblePosts = postIds.map(id => allPosts[id]).filter(Boolean);
 
     return (
         <div className="feed-layout">
@@ -106,27 +121,49 @@ const Feed = () => {
 
                     {/* 3. Post List */}
                     <div className="feed-list">
-                        {isLoading && posts.length === 0 && (
-                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-                                <LogoLoader size="3rem" text="Gathering tweets..." />
+                        {error && (
+                            <div className="feed-error-state">
+                                <p>Unable to load posts</p>
+                                <button onClick={() => { setError(null); fetchFeed(null, true); }} className="retry-btn">
+                                    Retry
+                                </button>
                             </div>
                         )}
-                        {posts.map((post, index) => {
-                            if (posts.length === index + 1) {
-                                return (
-                                    <div ref={lastPostElementRef} key={post._id || post.id}>
-                                        <PostCard post={post} />
-                                    </div>
-                                );
-                            } else {
-                                return <PostCard key={post._id || post.id} post={post} />;
-                            }
-                        })}
 
-                        {isLoading && posts.length > 0 && (
-                            <div className="feed-loader">
-                                <LogoLoader size="1.2rem" text="Loading more posts..." />
-                            </div>
+                        {isLoading && visiblePosts.length === 0 && (
+                            <>
+                                {[...Array(5)].map((_, i) => (
+                                    <PostSkeleton key={i} />
+                                ))}
+                            </>
+                        )}
+
+                        {visiblePosts.length > 0 && (
+                            <Virtuoso
+                                useWindowScroll
+                                data={visiblePosts}
+                                endReached={() => {
+                                    if (hasMore && !isLoading) {
+                                        fetchFeed(cursor);
+                                    }
+                                }}
+                                itemContent={(index, post) => (
+                                    <PostCard
+                                        key={post._id}
+                                        post={post}
+                                        onDelete={handleDeletePost}
+                                    />
+                                )}
+                                components={{
+                                    Footer: () => (
+                                        isLoading && (
+                                            <div className="feed-loader">
+                                                <LogoLoader size="1.2rem" text="Loading more posts..." />
+                                            </div>
+                                        )
+                                    )
+                                }}
+                            />
                         )}
                     </div>
                 </div>
@@ -137,5 +174,4 @@ const Feed = () => {
         </div >
     );
 };
-
 export default Feed;

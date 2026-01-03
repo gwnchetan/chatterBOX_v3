@@ -1,101 +1,71 @@
-import React, { useState, useRef, useEffect } from 'react'; // Added useEffect
+import React, { useState, useRef, useEffect } from 'react';
+import { useFeed } from '../../context/FeedContext';
+import { socketService } from '../../services/socket.service';
 import Avatar from '../common/Avatar';
-import { MoreHorizontal, Heart, MessageSquare, Share2, Repeat, ChevronLeft, ChevronRight, Trash, Bookmark } from '../common/Icons'; // Added Bookmark
-import userService from '../../services/user.service'; // Default import (fixed from postsService relative path if needed, but postsService is there too)
+import { MoreHorizontal, Heart, MessageSquare, Share2, Repeat, ChevronLeft, ChevronRight, Trash, Bookmark } from '../common/Icons';
 import { postsService } from '../../services/posts.service';
 import { useToast } from '../Toast';
 import ConfirmModal from '../common/ConfirmModal';
 import VideoPlayer from './VideoPlayer';
+import './PostCard.css';
 
-
+// Helper to format text with mentions
+const formatCommentText = (text) => {
+    if (!text) return null;
+    const parts = text.split(/(@\w+)/g);
+    return parts.map((part, index) => {
+        if (part.match(/^@\w+$/)) {
+            return <span key={index} className="comment-mention">{part}</span>;
+        }
+        return part;
+    });
+};
 
 const PostCard = ({ post, onDelete }) => {
-    // Repost Logic
+    const { toggleLike, toggleRepost, toggleSave, getPost } = useFeed();
     const isRepost = !!(post.repostOf && typeof post.repostOf === 'object');
+    // We try to get the realtime state of the display post from the store if it exists (for shared state)
+    // If not in store (e.g. nested in repost but not top-level), we fall back to prop but that might be stale/unhydrated if not carefully managed.
+    // Ideally, when we load feed, we should merge the *nested* posts into the store too?
+    // Yes! `Feed.jsx` should extract nested original posts and merge them into the store.
+    // That way `getPost(displayPost._id)` works and returns a hydrated object (if we hydrate it).
+
+    // For now, let's assume displayPost comes from props.
     const displayPost = isRepost ? post.repostOf : post;
+    // But we prefer the version from context if available to catch updates
+    const storedPost = getPost(displayPost._id);
+    const finalPost = storedPost || displayPost;
 
-    const [liked, setLiked] = useState(displayPost.isLiked || false);
-    const [likeCount, setLikeCount] = useState(displayPost.likeCount || 0);
-    const [repostCount, setRepostCount] = useState(displayPost.repostCount || 0);
-    const [saved, setSaved] = useState(false);
+    const liked = finalPost.liked || false;
+    const likeCount = finalPost.likeCount || 0;
+    const reposted = finalPost.reposted || false;
+    const repostCount = finalPost.repostCount || 0;
+    const saved = finalPost.saved || false;
+    const commentCount = finalPost.commentCount || 0;
 
-    // Comments State
     const [showComments, setShowComments] = useState(false);
     const [comments, setComments] = useState([]);
     const [commentsLoading, setCommentsLoading] = useState(false);
+    const [isPostingComment, setIsPostingComment] = useState(false);
     const [commentText, setCommentText] = useState('');
-    const [commentCount, setCommentCount] = useState(displayPost.commentCount || 0);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const user = JSON.parse(localStorage.getItem('user')) || {}; // Safe parse
-
-    // Auth check for wrapper post (deletion)
-    const isAuthor = user && (post.author?._id === user._id || post.author?._id === user.id || post.author === user.id);
+    const user = JSON.parse(localStorage.getItem('user')) || {};
+    const isAuthor = user && (finalPost.author?._id === user._id || finalPost.author?._id === user.id || finalPost.author === user.id);
     const toast = useToast();
 
-    // Check if saved on mount (Check against displayPost)
-    useEffect(() => {
-        if (user.savedPosts && Array.isArray(user.savedPosts)) {
-            const isSaved = user.savedPosts.some(p => (p._id || p) === displayPost._id);
-            setSaved(isSaved);
-        }
-        // Sync props if they change
-        if (displayPost.isLiked !== undefined) setLiked(displayPost.isLiked);
-        if (displayPost.likeCount !== undefined) setLikeCount(displayPost.likeCount);
-        if (displayPost.repostCount !== undefined) setRepostCount(displayPost.repostCount);
-        if (displayPost.commentCount !== undefined) setCommentCount(displayPost.commentCount);
-    }, [displayPost._id, user.savedPosts, displayPost.isLiked, displayPost.likeCount, displayPost.repostCount, displayPost.commentCount]);
+    // Removed local useEffect for sync, moved to Context-driven
+
 
     const handleSave = async (e) => {
         e.stopPropagation();
-        const originalSaved = saved;
-        setSaved(!saved); // Optimistic
-
-        try {
-            if (originalSaved) {
-                await userService.unsavePost(displayPost._id);
-            } else {
-                await userService.savePost(displayPost._id);
-            }
-
-            // Update local storage to keep UI consistent across refreshes/pages
-            const currentUser = JSON.parse(localStorage.getItem('user')) || {};
-            let currentSaved = currentUser.savedPosts || [];
-
-            if (originalSaved) {
-                // Removed
-                currentSaved = currentSaved.filter(p => (p._id || p) !== displayPost._id);
-            } else {
-                // Added (just ID is enough for check)
-                currentSaved.push(displayPost._id);
-            }
-
-            currentUser.savedPosts = currentSaved;
-            localStorage.setItem('user', JSON.stringify(currentUser));
-
-        } catch (error) {
-            console.error("Save failed", error);
-            setSaved(originalSaved); // Revert
-            toast.error("Failed to save post");
-        }
+        if (!user._id && !user.id) return toast.error("Please login to save");
+        toggleSave(finalPost._id);
     };
 
     const handleLike = async (e) => {
         e.stopPropagation();
-        if (!user._id) return toast.error("Please login to like");
-
-        const originalLiked = liked;
-        const originalCount = likeCount;
-
-        setLiked(!liked);
-        setLikeCount(liked ? likeCount - 1 : likeCount + 1);
-
-        try {
-            await postsService.toggleLike(displayPost._id);
-        } catch (error) {
-            setLiked(originalLiked);
-            setLikeCount(originalCount);
-            toast.error("Failed to like post");
-        }
+        if (!user._id && !user.id) return toast.error("Please login to like");
+        toggleLike(finalPost._id);
     };
 
     const toggleComments = async (e) => {
@@ -122,8 +92,9 @@ const PostCard = ({ post, onDelete }) => {
 
     const handlePostComment = async (e) => {
         e.preventDefault();
-        if (!commentText.trim()) return;
+        if (!commentText.trim() || isPostingComment) return; // Prevent multiple clicks
 
+        setIsPostingComment(true);
         try {
             const newComment = await postsService.addComment(displayPost._id, commentText);
             setComments(prev => [...prev, newComment]);
@@ -132,60 +103,131 @@ const PostCard = ({ post, onDelete }) => {
         } catch (error) {
             console.error(error);
             toast.error("Failed to post comment");
+        } finally {
+            setIsPostingComment(false);
+        }
+    };
+
+    const handleDeleteComment = async (commentId) => {
+        try {
+            await postsService.deleteComment(displayPost._id, commentId);
+            setComments(prev => prev.filter(c => c._id !== commentId));
+            setCommentCount(prev => prev - 1);
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to delete comment");
         }
     };
 
     const handleRepost = async (e) => {
         e.stopPropagation();
-        const originalCount = repostCount;
-        setRepostCount(prev => prev + 1); // Optimistic
-
-        try {
-            await postsService.repost(displayPost._id);
-            toast.success("Reposted!");
-        } catch (error) {
-            setRepostCount(originalCount);
-            toast.error("Failed to repost");
-        }
+        if (!user._id && !user.id) return toast.error("Please login to repost");
+        toggleRepost(finalPost._id);
     };
 
-    // Slider-based image logic
-    const [currentSlide, setCurrentSlide] = useState(0);
+    const [showLikeAnimation, setShowLikeAnimation] = useState(false);
+
+    const cardRef = useRef(null);
     const sliderRef = useRef(null);
+    const [currentSlide, setCurrentSlide] = useState(0);
 
-    const handleScroll = (e) => {
-        const scrollLeft = e.target.scrollLeft;
-        const width = e.target.offsetWidth;
-        const index = Math.round(scrollLeft / width);
-        setCurrentSlide(index);
-    };
-
-    const scrollNext = () => {
-        if (sliderRef.current) {
-            sliderRef.current.scrollBy({ left: sliderRef.current.offsetWidth, behavior: 'smooth' });
-        }
-    };
-
-    const scrollPrev = () => {
-        if (sliderRef.current) {
-            sliderRef.current.scrollBy({ left: -sliderRef.current.offsetWidth, behavior: 'smooth' });
-        }
-    };
-
-    const handleDeleteClick = () => {
+    const handleDeleteClick = (e) => {
+        e.stopPropagation();
         setShowDeleteModal(true);
     };
 
     const confirmDelete = async () => {
         try {
-            await postsService.deletePost(post._id);
-            if (onDelete) onDelete(post._id);
-            else window.location.reload();
+            await postsService.deletePost(displayPost._id);
+            if (onDelete) onDelete(displayPost._id);
+            toast.success("Post deleted");
         } catch (error) {
-            console.error('Failed to delete post:', error);
-            alert('Failed to delete post.');
+            toast.error("Failed to delete post");
         } finally {
             setShowDeleteModal(false);
+        }
+    };
+
+    const handleScroll = () => {
+        if (!sliderRef.current) return;
+        const scrollLeft = sliderRef.current.scrollLeft;
+        const width = sliderRef.current.clientWidth;
+        const index = Math.round(scrollLeft / width);
+        setCurrentSlide(index);
+    };
+
+    const scrollPrev = () => {
+        if (sliderRef.current) {
+            sliderRef.current.scrollBy({ left: -sliderRef.current.clientWidth, behavior: 'smooth' });
+        }
+    };
+
+    const scrollNext = () => {
+        if (sliderRef.current) {
+            sliderRef.current.scrollBy({ left: sliderRef.current.clientWidth, behavior: 'smooth' });
+        }
+    };
+
+    // Auto-close comments on scroll functionality
+    // Room Management & Auto-close
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                const postId = displayPost._id;
+                if (entry.isIntersecting) {
+                    socketService.joinPost(postId);
+                } else {
+                    socketService.leavePost(postId);
+                    if (showComments) setShowComments(false);
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        if (cardRef.current) {
+            observer.observe(cardRef.current);
+        }
+
+        return () => {
+            if (cardRef.current) {
+                observer.unobserve(cardRef.current);
+            }
+        };
+    }, [showComments, displayPost._id]);
+
+    // Real-time Comments Listener
+    useEffect(() => {
+        if (!showComments) return;
+
+        const handleNewComment = ({ postId, comment }) => {
+            if (postId === displayPost._id && comment) {
+                setComments(prev => {
+                    // Dedup: prevent double insert if socket fires faster than local API update or loopback
+                    if (prev.some(c => c._id === comment._id)) return prev;
+                    return [...prev, comment];
+                });
+            }
+        };
+
+        socketService.on('post:comment:update', handleNewComment);
+        return () => socketService.off('post:comment:update', handleNewComment);
+    }, [showComments, displayPost._id]);
+
+    // ... (existing helper functions)
+
+    const handleDoubleLike = async (e) => {
+        e.stopPropagation();
+
+        // Mobile/Tablet Check: Only allow on touch devices
+        const isTouch = window.matchMedia('(pointer: coarse)').matches;
+        if (!isTouch) return;
+
+        setShowLikeAnimation(true);
+        setTimeout(() => setShowLikeAnimation(false), 800);
+
+        // Always "Like" on double tap (never unlike)
+        if (!liked) {
+            toggleLike(finalPost._id);
         }
     };
 
@@ -193,7 +235,16 @@ const PostCard = ({ post, onDelete }) => {
         // Updated Logic: Check for Video first (Exclusive)
         const video = displayPost.media?.find(m => m.type === 'video');
         if (video) {
-            return <VideoPlayer media={video} />;
+            return (
+                <div className="media-wrapper-relative" style={{ position: 'relative' }}>
+                    <VideoPlayer media={video} onDoubleClick={handleDoubleLike} />
+                    {showLikeAnimation && (
+                        <div className="heart-overlay">
+                            <Heart />
+                        </div>
+                    )}
+                </div>
+            );
         }
 
         const media = displayPost.media?.filter(m => m.type !== 'video') || [];
@@ -204,7 +255,11 @@ const PostCard = ({ post, onDelete }) => {
         const containerAspect = firstItem.aspectRatio || firstItem.metadata?.aspect || 0.8;
 
         return (
-            <div className="post-slider-wrapper" style={{ aspectRatio: `${containerAspect}` }}>
+            <div
+                className="post-slider-wrapper"
+                style={{ aspectRatio: `${containerAspect}`, cursor: 'pointer' }}
+                onDoubleClick={handleDoubleLike}
+            >
                 <div
                     className="post-slider-track"
                     onScroll={handleScroll}
@@ -218,6 +273,12 @@ const PostCard = ({ post, onDelete }) => {
                         );
                     })}
                 </div>
+
+                {showLikeAnimation && (
+                    <div className="heart-overlay">
+                        <Heart />
+                    </div>
+                )}
 
                 {media.length > 1 && (
                     <>
@@ -253,7 +314,7 @@ const PostCard = ({ post, onDelete }) => {
     const authorAvatar = displayPost.author?.avatar || '';
 
     return (
-        <article className="post-card">
+        <article className="post-card" ref={cardRef}>
             {isRepost && (
                 <div className="repost-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px 8px', fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '600' }}>
                     <Repeat size={14} />
@@ -306,8 +367,8 @@ const PostCard = ({ post, onDelete }) => {
                 </button>
 
                 <button className="action-item" onClick={handleRepost}>
-                    <div className="icon-container">
-                        <Repeat />
+                    <div className={`icon-container ${reposted ? 'reposted' : ''}`}>
+                        <Repeat stroke={reposted ? "var(--color-success)" : "currentColor"} />
                     </div>
                     <span>{repostCount}</span>
                 </button>
@@ -327,65 +388,64 @@ const PostCard = ({ post, onDelete }) => {
 
             {/* Comments Section */}
             {showComments && (
-                <div className="comments-section" style={{ borderTop: '1px solid var(--border)', marginTop: '10px', paddingTop: '10px' }}>
-                    {commentsLoading && <div style={{ padding: '10px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading comments...</div>}
+                <div className="comments-section">
+                    {commentsLoading && <div className="comments-loading">Loading comments...</div>}
 
                     {!commentsLoading && comments.length === 0 && (
-                        <div style={{ padding: '15px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                        <div className="no-comments">
                             No comments yet. Be the first!
                         </div>
                     )}
 
-                    <div className="comments-list" style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '10px' }}>
-                        {comments.map(comment => (
-                            <div key={comment._id} className="comment-item" style={{ display: 'flex', gap: '10px', marginBottom: '12px', padding: '0 4px' }}>
-                                <Avatar src={comment.user.avatar} size="sm" />
-                                <div className="comment-content">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{comment.user.fullname}</span>
-                                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>@{comment.user.username}</span>
-                                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>· {new Date(comment.createdAt).toLocaleDateString()}</span>
+                    <div className="comments-list">
+                        {comments.map(comment => {
+                            const canDelete = user && (user._id === comment.user._id || user.id === comment.user._id || user._id === displayPost.author._id);
+                            return (
+                                <div key={comment._id} className="comment-item">
+                                    <div className="comment-avatar">
+                                        <Avatar src={comment.user.avatar} size="sm" />
                                     </div>
-                                    <p style={{ margin: '2px 0 0', fontSize: '0.95rem', lineHeight: '1.4' }}>{comment.content}</p>
+                                    <div className="comment-content">
+                                        <div className="comment-header">
+                                            <div className="comment-info">
+                                                <span className="comment-author">{comment.user.fullname}</span>
+                                                <span className="comment-username">@{comment.user.username}</span>
+                                                <span className="comment-time">· {new Date(comment.createdAt).toLocaleDateString()}</span>
+                                            </div>
+                                            {canDelete && (
+                                                <button
+                                                    onClick={() => handleDeleteComment(comment._id)}
+                                                    className="comment-delete-btn"
+                                                    title="Delete"
+                                                >
+                                                    <Trash size={14} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <p className="comment-text">{formatCommentText(comment.content)}</p>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
-                    <form onSubmit={handlePostComment} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                        <Avatar src={user.avatar} size="sm" />
+                    <form onSubmit={handlePostComment} className="reply-form">
+                        <div className="comment-avatar">
+                            <Avatar src={user.avatar} size="sm" />
+                        </div>
                         <input
                             type="text"
-                            placeholder="Post your reply"
+                            placeholder="Post your reply..."
                             value={commentText}
                             onChange={(e) => setCommentText(e.target.value)}
-                            style={{
-                                flex: 1,
-                                background: 'transparent',
-                                border: 'none',
-                                borderBottom: '1px solid var(--border)',
-                                padding: '8px 0',
-                                color: 'var(--text-main)',
-                                fontSize: '1rem',
-                                outline: 'none'
-                            }}
+                            className="reply-input"
                         />
                         <button
                             type="submit"
-                            disabled={!commentText.trim()}
-                            style={{
-                                background: 'var(--color-primary)',
-                                color: 'white',
-                                border: 'none',
-                                padding: '6px 16px',
-                                borderRadius: '20px',
-                                fontWeight: '600',
-                                fontSize: '0.9rem',
-                                cursor: commentText.trim() ? 'pointer' : 'default',
-                                opacity: commentText.trim() ? 1 : 0.5
-                            }}
+                            disabled={!commentText.trim() || isPostingComment}
+                            className="reply-btn"
                         >
-                            Reply
+                            {isPostingComment ? 'Posting...' : 'Reply'}
                         </button>
                     </form>
                 </div>

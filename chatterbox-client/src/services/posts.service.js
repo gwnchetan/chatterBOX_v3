@@ -78,5 +78,11 @@ export const postsService = {
         verifyAuth();
         const response = await api.get(`/posts/${postId}/comments`);
         return response.data;
+    },
+
+    deleteComment: async (postId, commentId) => {
+        verifyAuth();
+        const response = await api.delete(`/posts/${postId}/comments/${commentId}`);
+        return response.data;
     }
 };

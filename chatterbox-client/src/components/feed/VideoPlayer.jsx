@@ -10,7 +10,7 @@ import { Volume2, VolumeX, Play } from '../common/Icons';
  * 2. Uses IntersectionObserver for auto-play/pause.
  * 3. Handles Mute/Unmute.
  */
-const VideoPlayer = ({ media }) => {
+const VideoPlayer = ({ media, onDoubleClick }) => {
     const videoRef = useRef(null);
     const containerRef = useRef(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -106,6 +106,7 @@ const VideoPlayer = ({ media }) => {
             className="feed-video-container"
             style={{ aspectRatio: aspectRatio }}
             onClick={togglePlay}
+            onDoubleClick={onDoubleClick}
         >
             <video
                 ref={videoRef}

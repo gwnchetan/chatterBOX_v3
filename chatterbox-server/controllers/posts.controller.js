@@ -3,6 +3,7 @@ const User = require('../models/users');
 const Like = require('../models/likes');
 const Comment = require('../models/comments');
 const { deleteMedia, generateSignature } = require('../utils/cloudinary');
+const { getIo } = require('../socket');
 
 // Simple in-memory rate limiter per instance (Temporary)
 // TODO: Replace with Redis-based rate limiter in production environment
@@ -133,10 +134,11 @@ exports.getFeed = async (req, res) => {
         const { cursor, limit = 20 } = req.query;
         const limitNum = parseInt(limit);
 
-        // 1. Block Logic
-        // Fetch users blocked by current user
+        // 1. Block Logic & User Data
+        // Fetch users blocked by current user AND saved posts
         const currentUser = await User.findById(userId).populate('blockedUsers');
         const blockedByMe = currentUser.blockedUsers.map(u => u._id.toString());
+        const savedPostIds = new Set(currentUser.savedPosts ? currentUser.savedPosts.map(s => s.toString()) : []);
 
         // Fetch users who blocked current user
         // Optimization: In-memory cache with fallback
@@ -153,7 +155,6 @@ exports.getFeed = async (req, res) => {
                 blockCache.set(userId.toString(), { blockedBy: blockedMe, timestamp: now });
             } catch (err) {
                 console.error('Error fetching blocked-me users, passing empty list to avoid feed break:', err);
-                // Fallback: If DB fails, we proceed with empty list to not break the feed
                 blockedMe = [];
             }
         }
@@ -178,14 +179,12 @@ exports.getFeed = async (req, res) => {
         }
 
         // 3. Application-Level Filter Loop
-        // Deterministic buffer rule: limit + 50%
-        // This ensures we have enough posts after filtering (private/blocks) without over-fetching
         const fetchLimit = limitNum + Math.ceil(limitNum * 0.5);
 
         const posts = await Post.find(query)
             .sort({ createdAt: -1, _id: -1 })
             .limit(fetchLimit)
-            .populate('author', 'username fullname avatar') // Populate author details
+            .populate('author', 'username fullname avatar')
             .populate({
                 path: 'repostOf',
                 populate: { path: 'author', select: 'username fullname avatar' }
@@ -218,19 +217,28 @@ exports.getFeed = async (req, res) => {
             nextCursor = `${lastPost.createdAt.toISOString()}_${lastPost._id}`;
         }
 
-        // If we exhausted fetched posts but still have more in DB, cursor logic holds true 
-        // because we sort by createdAt. 
-
-        // 5. Hydrate with "isLiked" status
-        // Efficiently find which of these posts the user has liked
+        // 5. Hydrate with User Status
         const postIds = validPosts.map(p => p._id);
-        const userLikes = await Like.find({ post: { $in: postIds }, user: userId }).select('post');
-        const likedPostIds = new Set(userLikes.map(l => l.post.toString()));
 
-        const hydratedPosts = validPosts.map(post => ({
-            ...post.toObject(),
-            isLiked: likedPostIds.has(post._id.toString())
-        }));
+        const [userLikes, userReposts] = await Promise.all([
+            Like.find({ post: { $in: postIds }, user: userId }).select('post'),
+            Post.find({ repostOf: { $in: postIds }, author: userId }).select('repostOf')
+        ]);
+
+        const likedPostIds = new Set(userLikes.map(l => l.post.toString()));
+        const repostedPostIds = new Set(userReposts.map(r => r.repostOf.toString()));
+
+        const hydratedPosts = validPosts.map(post => {
+            const p = post.toObject();
+            return {
+                ...p,
+                liked: likedPostIds.has(p._id.toString()),
+                reposted: repostedPostIds.has(p._id.toString()),
+                saved: savedPostIds.has(p._id.toString()),
+                isRepost: !!p.repostOf,
+                originalPost: p.repostOf || null
+            };
+        });
 
         res.json({
             posts: hydratedPosts,
@@ -339,13 +347,25 @@ exports.toggleLike = async (req, res) => {
             // Unlike
             await Like.deleteOne({ _id: existingLike._id });
             await Post.findByIdAndUpdate(postId, { $inc: { likeCount: -1 } });
-            return res.json({ message: 'Post unliked', liked: false, likeCount: post.likeCount - 1 });
+
+            const newCount = post.likeCount - 1;
+            try {
+                getIo().to(`post:${postId}`).emit('post:like:update', { postId, likesCount: newCount });
+            } catch (error) { console.error("Socket emit failed", error); }
+
+            return res.json({ message: 'Post unliked', liked: false, likeCount: newCount });
         } else {
             // Like
             const newLike = new Like({ post: postId, user: userId });
             await newLike.save();
             await Post.findByIdAndUpdate(postId, { $inc: { likeCount: 1 } });
-            return res.json({ message: 'Post liked', liked: true, likeCount: post.likeCount + 1 });
+
+            const newCount = post.likeCount + 1;
+            try {
+                getIo().to(`post:${postId}`).emit('post:like:update', { postId, likesCount: newCount });
+            } catch (error) { console.error("Socket emit failed", error); }
+
+            return res.json({ message: 'Post liked', liked: true, likeCount: newCount });
         }
     } catch (error) {
         console.error('Error toggling like:', error);
@@ -382,6 +402,14 @@ exports.addComment = async (req, res) => {
         // Build response with author info for immediate UI update
         const fullComment = await Comment.findById(newComment._id).populate('user', 'username fullname avatar');
 
+        try {
+            getIo().to(`post:${postId}`).emit('post:comment:update', {
+                postId,
+                commentCount: post.commentCount + 1,
+                comment: fullComment
+            });
+        } catch (error) { console.error("Socket emit failed", error); }
+
         res.status(201).json(fullComment);
     } catch (error) {
         console.error('Error adding comment:', error);
@@ -413,30 +441,73 @@ exports.getComments = async (req, res) => {
  */
 exports.repost = async (req, res) => {
     try {
-        const originalPostId = req.params.id;
+        const targetId = req.params.id;
         const userId = req.user._id;
 
-        const originalPost = await Post.findById(originalPostId);
-        if (!originalPost) return res.status(404).json({ message: 'Post not found' });
+        let targetPost = await Post.findById(targetId);
+        if (!targetPost) return res.status(404).json({ message: 'Post not found' });
 
-        // Check if already reposted? (Optional, skipping for "basic")
-        // Create Repost
-        const newPost = new Post({
+        // Flatten reposts: If target is a repost, use the original post
+        const originalPostId = targetPost.repostOf ? targetPost.repostOf : targetId;
+
+        // Check if already reposted by this user
+        const existingRepost = await Post.findOne({
             author: userId,
-            repostOf: originalPostId,
-            visibility: 'public', // Default to public for now
-            createdAt: new Date()
+            repostOf: originalPostId
         });
 
-        await newPost.save();
+        if (existingRepost) {
+            // Un-repost (Toggle off)
+            await Post.findByIdAndDelete(existingRepost._id);
+            await Post.findByIdAndUpdate(originalPostId, { $inc: { repostCount: -1 } });
+            return res.json({ message: 'Repost removed', reposted: false });
+        } else {
+            // Create Repost
+            const newPost = new Post({
+                author: userId,
+                repostOf: originalPostId,
+                visibility: 'public', // Default to public
+                createdAt: new Date()
+            });
 
-        // Update original post count
-        await Post.findByIdAndUpdate(originalPostId, { $inc: { repostCount: 1 } });
+            await newPost.save();
+            await Post.findByIdAndUpdate(originalPostId, { $inc: { repostCount: 1 } });
 
-        res.status(201).json({ message: 'Reposted successfully', post: newPost });
+            return res.status(201).json({ message: 'Reposted successfully', reposted: true, post: newPost });
+        }
 
     } catch (error) {
         console.error('Error reposting:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+/**
+ * Delete Comment
+ * DELETE /api/posts/:postId/comments/:commentId
+ */
+exports.deleteComment = async (req, res) => {
+    try {
+        const { postId, commentId } = req.params;
+        const userId = req.user._id;
+
+        const comment = await Comment.findById(commentId);
+        if (!comment) return res.status(404).json({ message: 'Comment not found' });
+
+        const post = await Post.findById(postId);
+        if (!post) return res.status(404).json({ message: 'Post not found' });
+
+        // Authorization: Comment Author OR Post Author can delete
+        if (comment.user.toString() !== userId.toString() && post.author.toString() !== userId.toString()) {
+            return res.status(403).json({ message: 'Unauthorized to delete this comment' });
+        }
+
+        await Comment.deleteOne({ _id: commentId });
+        await Post.findByIdAndUpdate(postId, { $inc: { commentCount: -1 } });
+
+        res.json({ message: 'Comment deleted' });
+    } catch (error) {
+        console.error('Error deleting comment:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 };

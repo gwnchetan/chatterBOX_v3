@@ -24,5 +24,7 @@ router.get('/:userId/posts', userController.getUserPosts);
 // Follow/Unfollow
 router.post('/:userId/follow', authMiddleware, userController.followUser);
 router.post('/:userId/unfollow', authMiddleware, userController.unfollowUser);
+router.post('/:userId/accept', authMiddleware, userController.acceptFollowRequest);
+router.post('/:userId/reject', authMiddleware, userController.rejectFollowRequest);
 
 module.exports = router;

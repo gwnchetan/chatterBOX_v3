@@ -1,17 +1,46 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Avatar from '../common/Avatar';
 import { Heart, MessageSquare, UserPlus, Zap } from '../common/Icons';
+import userService from '../../services/user.service';
+import { useToast } from '../Toast'; // Assuming Hook exists
 
 const NotificationItem = ({ notification }) => {
     const { sender, type, text, createdAt, post, read } = notification;
     const navigate = useNavigate();
+    const toast = useToast();
+    const [actionStatus, setActionStatus] = useState(null);
+
+    const handleAccept = async (e) => {
+        e.stopPropagation();
+        try {
+            await userService.acceptFollowRequest(sender._id);
+            setActionStatus('accepted');
+            toast.success("Request accepted");
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to accept");
+        }
+    };
+
+    const handleReject = async (e) => {
+        e.stopPropagation();
+        try {
+            await userService.rejectFollowRequest(sender._id);
+            setActionStatus('rejected');
+            toast.success("Request rejected");
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to reject");
+        }
+    };
 
     const renderIcon = () => {
         switch (type) {
             case 'like': return <Heart size={10} fill="white" stroke="white" />;
             case 'comment': return <MessageSquare size={10} fill="white" stroke="white" />;
             case 'follow': return <UserPlus size={10} stroke="white" />;
+            case 'request': return <UserPlus size={10} stroke="white" />;
             default: return <Zap size={10} stroke="white" />;
         }
     };
@@ -21,6 +50,7 @@ const NotificationItem = ({ notification }) => {
             case 'like': return 'var(--color-error)';
             case 'comment': return 'var(--color-primary)';
             case 'follow': return 'var(--color-success)';
+            case 'request': return 'var(--color-primary)';
             default: return 'var(--color-text-muted)';
         }
     };
@@ -30,7 +60,7 @@ const NotificationItem = ({ notification }) => {
             case 'like': return "Liked your post";
             case 'comment': return "Commented on your post";
             case 'follow': return "Started following you";
-            case 'request': return "Sent you a friend request";
+            case 'request': return "requested to follow you";
             default: return "Sent a notification";
         }
     };
@@ -85,6 +115,43 @@ const NotificationItem = ({ notification }) => {
                     </span>
                     {renderMessage()}
                 </div>
+
+                {type === 'request' && !actionStatus && (
+                    <div className="notif-actions" style={{ display: 'flex', gap: '8px', marginTop: '6px' }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                            onClick={handleAccept}
+                            style={{
+                                background: 'var(--color-primary)',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '6px 16px',
+                                color: 'white',
+                                fontSize: '0.85rem',
+                                fontWeight: '600',
+                                cursor: 'pointer'
+                            }}
+                        >Confirm</button>
+                        <button
+                            onClick={handleReject}
+                            style={{
+                                background: 'rgba(255,255,255,0.1)',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '6px 16px',
+                                color: 'var(--color-text-main)',
+                                fontSize: '0.85rem',
+                                fontWeight: '600',
+                                cursor: 'pointer'
+                            }}
+                        >Delete</button>
+                    </div>
+                )}
+                {actionStatus && (
+                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                        {actionStatus === 'accepted' ? 'Request Accepted' : 'Request Removed'}
+                    </div>
+                )}
+
                 <span className="notif-time">{timeAgo(createdAt)}</span>
             </div>
 

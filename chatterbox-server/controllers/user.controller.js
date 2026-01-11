@@ -265,6 +265,76 @@ exports.unfollowUser = async (req, res) => {
 };
 
 /**
+ * Accept follow request
+ * POST /api/users/:userId/accept
+ * Note: userId here is the REQUESTER (the person who wants to follow me)
+ */
+exports.acceptFollowRequest = async (req, res) => {
+    try {
+        const requesterId = req.params.userId;
+        const currentUserId = req.user._id;
+
+        // Verify request exists
+        const currentUser = await User.findById(currentUserId);
+        if (!currentUser.followRequests.includes(requesterId)) {
+            return res.status(404).json({ message: "Request not found" });
+        }
+
+        await Promise.all([
+            // Add to followers of current user
+            User.findByIdAndUpdate(currentUserId, {
+                $addToSet: { followers: requesterId },
+                $pull: { followRequests: requesterId }
+            }),
+            // Add to following of requester
+            User.findByIdAndUpdate(requesterId, {
+                $addToSet: { following: currentUserId }
+            })
+        ]);
+
+        // Send Notification to Requester
+        const notif = new Notification({
+            recipient: requesterId,
+            sender: currentUserId,
+            type: 'follow',
+            text: 'accepted your follow request'
+        });
+        await notif.save();
+        await notif.populate('sender', 'username fullname avatar');
+
+        try {
+            getIo().to(`user:${requesterId}`).emit('notification:new', notif);
+        } catch (e) { console.error(e) }
+
+        res.json({ message: "Request accepted" });
+
+    } catch (error) {
+        console.error("Error accepting request:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+/**
+ * Reject follow request
+ * POST /api/users/:userId/reject
+ */
+exports.rejectFollowRequest = async (req, res) => {
+    try {
+        const requesterId = req.params.userId;
+        const currentUserId = req.user._id;
+
+        await User.findByIdAndUpdate(currentUserId, {
+            $pull: { followRequests: requesterId }
+        });
+
+        res.json({ message: "Request rejected" });
+    } catch (error) {
+        console.error("Error rejecting request:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+/**
  * Search users
  * GET /api/users/search?q=query
  */

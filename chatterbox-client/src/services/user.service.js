@@ -44,6 +44,16 @@ const userService = {
         return response.data;
     },
 
+    acceptFollowRequest: async (userId) => {
+        const response = await api.post(`/users/${userId}/accept`);
+        return response.data;
+    },
+
+    rejectFollowRequest: async (userId) => {
+        const response = await api.post(`/users/${userId}/reject`);
+        return response.data;
+    },
+
     savePost: async (postId) => {
         const response = await api.post(`/users/save/${postId}`);
         return response.data;

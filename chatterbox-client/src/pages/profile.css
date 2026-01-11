@@ -174,7 +174,7 @@
     transform: translateY(-2px);
 }
 
-.btn-mobile-settings {
+.btn-settings-mobile-only {
     display: none !important;
 }
 
@@ -496,7 +496,7 @@
         font-size: 0.75rem;
     }
 
-    .btn-mobile-settings {
+    .btn-settings-mobile-only {
         display: flex !important;
     }
 }

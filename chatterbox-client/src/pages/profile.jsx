@@ -218,7 +218,7 @@ const Profile = () => {
                                                 <span>Edit Profile</span>
                                             </button>
                                             <button
-                                                className="btn-edit-profile btn-mobile-settings"
+                                                className="btn-edit-profile btn-settings-mobile-only"
                                                 style={{ padding: '12px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-main)' }}
                                                 onClick={() => setIsSettingsOpen(true)}
                                             >

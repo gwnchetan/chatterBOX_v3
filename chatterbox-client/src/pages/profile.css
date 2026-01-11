@@ -527,3 +527,39 @@
         font-size: 0.75rem;
     }
 }
+
+/* Private Profile View */
+.private-profile-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    color: var(--color-text-main);
+    text-align: center;
+    background: var(--color-bg);
+}
+
+.private-icon-circle {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px solid var(--color-text-main);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    color: var(--color-text-main);
+}
+
+.private-profile-view h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 12px 0;
+}
+
+.private-profile-view p {
+    font-size: 1rem;
+    color: var(--color-text-muted);
+    margin: 0;
+}

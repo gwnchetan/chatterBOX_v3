@@ -26,7 +26,7 @@
     border-radius: 0;
     display: flex;
     flex-direction: column;
-    border-right: 1px solid var(--color-border);
+    border-right: none;
     /* Visual separator */
     background-color: var(--color-bg);
     /* Match bg */
@@ -53,9 +53,9 @@
     min-width: 0;
     padding: 0;
     /* Feed content handles internal padding */
-    border-right: 1px solid var(--color-border);
+    border-right: none;
     /* Optional: define feed boundaries */
-    border-left: 1px solid var(--color-border);
+    border-left: none;
     /* Optional */
 }
 
@@ -77,7 +77,7 @@
     right: 0;
     padding: 20px 24px;
     background-color: var(--color-bg);
-    border-left: 1px solid var(--color-border);
+    border-left: none;
     overflow-y: auto;
     z-index: 40;
     display: flex;
@@ -423,7 +423,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-top: none;
     font-size: 0.9rem;
     color: var(--color-text-muted);
 }
@@ -652,8 +652,9 @@
     justify-content: space-between;
     align-items: center;
     padding: 20px 0;
+    padding: 20px 0;
     margin-bottom: 20px;
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: none;
 }
 
 .feed-header-unified h1 {
@@ -673,7 +674,7 @@
     background: rgba(255, 255, 255, 0.03);
     padding: 6px 8px;
     border-radius: 99px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: none;
 }
 
 .text-filter {
@@ -717,7 +718,7 @@
     max-width: 100%;
     background-color: var(--color-surface) !important;
     border-radius: 24px;
-    border: 1px solid var(--color-border);
+    border: none;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -734,7 +735,7 @@
     /* Soft container */
     border-radius: 16px;
     /* Rounded corners */
-    border: 1px solid rgba(255, 255, 255, 0.03);
+    border: none;
     /* Extremely subtle border */
 }
 
@@ -903,7 +904,7 @@
 
 .btn-follow {
     background-color: transparent;
-    border: 1px solid var(--color-border);
+    border: none;
     color: var(--color-text-main);
     padding: 4px 14px;
     border-radius: 99px;
@@ -936,7 +937,7 @@
     height: 80px;
     border-radius: 12px;
     background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
+    border: none;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -975,7 +976,7 @@
     background-color: var(--color-surface);
     border-radius: 12px;
     animation: none;
-    border: 1px solid var(--color-border);
+    border: none;
     background-image: none !important;
     /* Remove background images for consistency */
 }
@@ -1009,7 +1010,7 @@
     flex-direction: column;
     padding-bottom: 24px;
     margin-bottom: 24px;
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: none;
 }
 
 .rs-partition:last-child {
@@ -1124,7 +1125,6 @@
 .add-story-card {
     background-color: var(--color-bg);
     border: none;
-    border: 1px dashed var(--color-border);
     /* Dashed border for add card */
 }
 
@@ -1205,6 +1205,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    gap: 10px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
     border: none;
     transition: transform 0.2s, background-color 0.2s;
@@ -1283,7 +1284,7 @@
 .btn-decline {
     background-color: var(--color-bg);
     /* Light gray/bg */
-    border: 1px solid var(--color-border);
+    border: none;
     color: var(--color-text-muted);
 }
 

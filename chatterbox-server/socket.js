@@ -40,6 +40,16 @@ const initSocket = (server) => {
             }
         });
 
+        // Join specific user room (user:{userId}) - For notifications
+        socket.on('join_user', (userId) => {
+            // Allow joining only own room for privacy, or allow if logic permits
+            // socket.user is populated from token.
+            // We trust the token user ID.
+            if (userId && (socket.user.id === userId || socket.user._id === userId)) {
+                socket.join(`user:${userId}`);
+            }
+        });
+
         // Leave specific post room
         socket.on('leave_post', (postId) => {
             if (postId) {

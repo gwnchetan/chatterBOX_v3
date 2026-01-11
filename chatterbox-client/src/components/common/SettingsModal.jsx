@@ -1,9 +1,44 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
-import { X, Moon, Sun } from './Icons';
+import { X, Moon, Sun, Lock } from './Icons';
+import userService from '../../services/user.service';
 
 const SettingsModal = ({ isOpen, onClose }) => {
     const { theme, setMode } = useTheme();
+    const [isPrivate, setIsPrivate] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            const fetchSettings = async () => {
+                try {
+                    const userStr = localStorage.getItem('user');
+                    if (userStr) {
+                        const user = JSON.parse(userStr);
+                        // Fetch fresh profile data
+                        const data = await userService.getProfile(user._id || user.id);
+                        setIsPrivate(data.user.isPrivate || false);
+                    }
+                } catch (error) {
+                    console.error("Failed to load settings", error);
+                }
+            };
+            fetchSettings();
+        }
+    }, [isOpen]);
+
+    const togglePrivacy = async () => {
+        try {
+            setLoading(true);
+            const newState = !isPrivate;
+            await userService.updateProfile({ isPrivate: newState });
+            setIsPrivate(newState);
+        } catch (error) {
+            console.error("Failed to update privacy", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     if (!isOpen) return null;
 
@@ -35,6 +70,30 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                 <Moon size={18} />
                                 <span>Dark Mode</span>
                             </button>
+                        </div>
+                    </div>
+
+                    <div className="setting-section" style={{ marginTop: '24px' }}>
+                        <h4>Account & Privacy</h4>
+                        <div className="privacy-toggle-row">
+                            <div className="privacy-info">
+                                <div className="privacy-label-row">
+                                    <Lock size={18} />
+                                    <span className="privacy-label">Private Account</span>
+                                </div>
+                                <span className="privacy-desc">
+                                    Only followers will be able to see your posts and interact with you.
+                                </span>
+                            </div>
+                            <label className="toggle-switch">
+                                <input
+                                    type="checkbox"
+                                    checked={isPrivate}
+                                    onChange={togglePrivacy}
+                                    disabled={loading}
+                                />
+                                <span className="slider round"></span>
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -128,6 +187,76 @@ const SettingsModal = ({ isOpen, onClose }) => {
                     color: var(--color-primary);
                     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
                     font-weight: 600;
+                }
+                .privacy-toggle-row {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    background: var(--color-bg);
+                    padding: 12px;
+                    border-radius: 12px;
+                }
+                .privacy-info {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                }
+                .privacy-label-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    color: var(--color-text-main);
+                    font-weight: 600;
+                }
+                .privacy-desc {
+                    font-size: 0.8rem;
+                    color: var(--color-text-muted);
+                    max-width: 200px;
+                }
+                /* Toggle Switch */
+                .toggle-switch {
+                    position: relative;
+                    display: inline-block;
+                    width: 50px;
+                    height: 28px;
+                    flex-shrink: 0;
+                }
+                .toggle-switch input { 
+                    opacity: 0;
+                    width: 0;
+                    height: 0;
+                }
+                .slider {
+                    position: absolute;
+                    cursor: pointer;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: var(--color-border);
+                    transition: .4s;
+                }
+                .slider:before {
+                    position: absolute;
+                    content: "";
+                    height: 20px;
+                    width: 20px;
+                    left: 4px;
+                    bottom: 4px;
+                    background-color: white; /* Thumb color */
+                    transition: .4s;
+                }
+                input:checked + .slider {
+                    background-color: var(--color-primary);
+                }
+                input:checked + .slider:before {
+                    transform: translateX(22px);
+                }
+                .slider.round {
+                    border-radius: 34px;
+                }
+                .slider.round:before {
+                    border-radius: 50%;
                 }
                 @keyframes modalPop {
                     from { transform: scale(0.95); opacity: 0; }

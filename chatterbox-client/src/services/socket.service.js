@@ -37,7 +37,7 @@ class SocketService {
     }
 
     joinPost(postId) {
-        if (this.socket && this.socket.connected && postId) {
+        if (this.socket && postId) {
             this.socket.emit('join_post', postId);
         }
     }
@@ -45,6 +45,12 @@ class SocketService {
     leavePost(postId) {
         if (this.socket && postId) {
             this.socket.emit('leave_post', postId);
+        }
+    }
+
+    joinUser(userId) {
+        if (this.socket && userId) {
+            this.socket.emit('join_user', userId);
         }
     }
 

@@ -27,10 +27,14 @@ app.use(express.json());
 const authRoutes = require('./routes/auth.routes');
 const postsRoutes = require('./routes/posts.routes');
 const userRoutes = require('./routes/user.routes');
+// const testRoute = require('./routes/test');
+const notificationRoutes = require('./routes/notifs');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postsRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/notifications', notificationRoutes);
+// app.use('/api/test', testRoute); // Mount the test route
 
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {

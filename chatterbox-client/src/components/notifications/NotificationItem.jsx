@@ -1,0 +1,105 @@
+import React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import Avatar from '../common/Avatar';
+import { Heart, MessageSquare, UserPlus, Zap } from '../common/Icons';
+
+const NotificationItem = ({ notification }) => {
+    const { sender, type, text, createdAt, post, read } = notification;
+    const navigate = useNavigate();
+
+    const renderIcon = () => {
+        switch (type) {
+            case 'like': return <Heart size={10} fill="white" stroke="white" />;
+            case 'comment': return <MessageSquare size={10} fill="white" stroke="white" />;
+            case 'follow': return <UserPlus size={10} stroke="white" />;
+            default: return <Zap size={10} stroke="white" />;
+        }
+    };
+
+    const getIconBgColor = () => {
+        switch (type) {
+            case 'like': return 'var(--color-error)';
+            case 'comment': return 'var(--color-primary)';
+            case 'follow': return 'var(--color-success)';
+            default: return 'var(--color-text-muted)';
+        }
+    };
+
+    const renderMessage = () => {
+        switch (type) {
+            case 'like': return "Liked your post";
+            case 'comment': return "Commented on your post";
+            case 'follow': return "Started following you";
+            case 'request': return "Sent you a friend request";
+            default: return "Sent a notification";
+        }
+    };
+
+    // Simple time ago helper
+    const timeAgo = (dateStr) => {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const seconds = Math.floor((now - date) / 1000);
+
+        if (seconds < 60) return 'Just now';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        const days = Math.floor(hours / 24);
+        return `${days}d ago`;
+    };
+
+    const handleItemClick = () => {
+        if (post && post._id) {
+            navigate(`/post/${post._id}`);
+        }
+    };
+
+    return (
+        <div className={`notification-item`} onClick={handleItemClick}>
+            {/* Unread Dot (Left) */}
+            {!read && <div className="unread-indicator"></div>}
+
+            {/* Avatar with Badge */}
+            <div className="notif-avatar-wrapper" onClick={(e) => e.stopPropagation()}>
+                <Link to={`/profile/${sender._id}`}>
+                    <Avatar src={sender.avatar} size="md" />
+                </Link>
+                <div className="notif-icon-badge" style={{ backgroundColor: getIconBgColor() }}>
+                    {renderIcon()}
+                </div>
+            </div>
+
+            {/* Content (Middle) */}
+            <div className="notif-content">
+                <div className="notif-text">
+                    <span
+                        className="notif-user"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/profile/${sender._id}`);
+                        }}
+                    >
+                        {sender.fullname || sender.username}
+                    </span>
+                    {renderMessage()}
+                </div>
+                <span className="notif-time">{timeAgo(createdAt)}</span>
+            </div>
+
+            {/* Post Preview (Right) */}
+            {post && post.media && post.media[0] && (
+                <div className="notif-post-preview">
+                    {post.media[0].type === 'image' ? (
+                        <img src={post.media[0].url} alt="post" />
+                    ) : (
+                        <video src={post.media[0].url} />
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default NotificationItem;

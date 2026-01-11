@@ -2,6 +2,7 @@ const Post = require('../models/posts');
 const User = require('../models/users');
 const Like = require('../models/likes');
 const Comment = require('../models/comments');
+const Notification = require('../models/notifications');
 const { deleteMedia, generateSignature } = require('../utils/cloudinary');
 const { getIo } = require('../socket');
 
@@ -161,6 +162,17 @@ exports.getFeed = async (req, res) => {
 
         const blockedSet = new Set([...blockedByMe, ...blockedMe]);
 
+        // Privacy Filtering: Hide posts from private users I don't follow
+        const followingIds = currentUser.following.map(id => id.toString());
+        const excludeFromPrivacyCheck = [...followingIds, userId.toString()];
+
+        const privateUsersToHide = await User.find({
+            isPrivate: true,
+            _id: { $nin: excludeFromPrivacyCheck }
+        }).select('_id');
+
+        privateUsersToHide.forEach(u => blockedSet.add(u._id.toString()));
+
         // 2. Query Setup
         const query = {
             isDeleted: false,
@@ -184,16 +196,33 @@ exports.getFeed = async (req, res) => {
         const posts = await Post.find(query)
             .sort({ createdAt: -1, _id: -1 })
             .limit(fetchLimit)
-            .populate('author', 'username fullname avatar')
+            .populate('author', 'username fullname avatar isPrivate')
             .populate({
                 path: 'repostOf',
-                populate: { path: 'author', select: 'username fullname avatar' }
+                populate: { path: 'author', select: 'username fullname avatar isPrivate' }
             });
 
         const validPosts = [];
         const followingStr = currentUser.following.map(id => id.toString());
 
         for (const post of posts) {
+            // 1. Check Direct Author Privacy
+            if (post.author.isPrivate) {
+                const isMyPost = post.author._id.toString() === userId.toString();
+                const amIFollowing = followingStr.includes(post.author._id.toString());
+                if (!isMyPost && !amIFollowing) continue;
+            }
+
+            // 2. Check Repost Original Author Privacy
+            if (post.repostOf && post.repostOf.author) {
+                const originAuthor = post.repostOf.author;
+                if (originAuthor.isPrivate) {
+                    const isMyOrigin = originAuthor._id.toString() === userId.toString();
+                    const amIFollowingOrigin = followingStr.includes(originAuthor._id.toString());
+                    if (!isMyOrigin && !amIFollowingOrigin) continue;
+                }
+            }
+
             // Visibility Logic
             if (post.visibility === 'public') {
                 validPosts.push(post);
@@ -293,6 +322,7 @@ exports.getExploreFeed = async (req, res) => {
             { $sort: { createdAt: -1 } },
             { $lookup: { from: 'users', localField: 'author', foreignField: '_id', as: 'author' } },
             { $unwind: '$author' },
+            { $match: { 'author.isPrivate': { $ne: true } } },
             { $project: { 'author.password': 0, 'author.email': 0, 'author.blockedUsers': 0 } }
         ]);
 
@@ -313,14 +343,16 @@ exports.searchPosts = async (req, res) => {
         if (!q) return res.json({ posts: [] });
 
         // Simple regex search (case-insensitive)
-        const posts = await Post.find({
+        const rawPosts = await Post.find({
             content: { $regex: q, $options: 'i' },
             visibility: 'public',
             isDeleted: false
         })
             .sort({ createdAt: -1 })
             .limit(parseInt(limit))
-            .populate('author', 'username fullname avatar');
+            .populate('author', 'username fullname avatar isPrivate');
+
+        const posts = rawPosts.filter(p => !p.author.isPrivate);
 
         res.json({ posts });
     } catch (error) {
@@ -364,6 +396,19 @@ exports.toggleLike = async (req, res) => {
             try {
                 getIo().to(`post:${postId}`).emit('post:like:update', { postId, likesCount: newCount });
             } catch (error) { console.error("Socket emit failed", error); }
+
+            // Create Notification
+            if (post.author.toString() !== userId.toString()) {
+                const notif = new Notification({
+                    recipient: post.author,
+                    sender: userId,
+                    type: 'like',
+                    post: postId
+                });
+                await notif.save();
+                await notif.populate('sender', 'username fullname avatar');
+                getIo().to(`user:${post.author.toString()}`).emit('notification:new', notif);
+            }
 
             return res.json({ message: 'Post liked', liked: true, likeCount: newCount });
         }
@@ -409,6 +454,21 @@ exports.addComment = async (req, res) => {
                 comment: fullComment
             });
         } catch (error) { console.error("Socket emit failed", error); }
+
+        // Create Notification
+        if (post.author.toString() !== userId.toString()) {
+            const notif = new Notification({
+                recipient: post.author,
+                sender: userId,
+                type: 'comment',
+                post: postId,
+                comment: newComment._id,
+                text: content
+            });
+            await notif.save();
+            await notif.populate('sender', 'username fullname avatar');
+            getIo().to(`user:${post.author.toString()}`).emit('notification:new', notif);
+        }
 
         res.status(201).json(fullComment);
     } catch (error) {

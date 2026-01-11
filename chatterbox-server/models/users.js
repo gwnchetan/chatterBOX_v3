@@ -18,7 +18,9 @@ const userSchema = new mongoose.Schema({
     following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Track followers too
     savedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }], // Saved posts
-    blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+    blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    followRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Pending follow requests
+    isPrivate: { type: Boolean, default: false }
 });
 
 module.exports = mongoose.model("User", userSchema);

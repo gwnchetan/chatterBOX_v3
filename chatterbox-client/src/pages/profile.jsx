@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import userService from '../services/user.service';
 import PostCard from '../components/feed/PostCard';
 import ProfilePostCard from '../components/feed/ProfilePostCard';
-import { MapPin, Link as LinkIcon, Calendar, Edit3, Grid, List as ListIcon, Heart, MessageSquare } from '../components/common/Icons';
+import { MapPin, Link as LinkIcon, Calendar, Edit3, Grid, List as ListIcon, Heart, MessageSquare, Lock } from '../components/common/Icons';
 import { useToast } from '../components/Toast';
 import EditProfileModal from '../components/profile/EditProfileModal';
 import PostDetailModal from '../components/profile/PostDetailModal';
@@ -28,50 +28,47 @@ const Profile = () => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedPost, setSelectedPost] = useState(null);
     const [isFollowing, setIsFollowing] = useState(false);
+    const [isRequested, setIsRequested] = useState(false);
     const [followLoading, setFollowLoading] = useState(false);
 
     const currentUser = JSON.parse(localStorage.getItem('user'));
     const isOwner = currentUser && (userId === (currentUser.id || currentUser._id));
 
-    // Check if following
-    useEffect(() => {
-        const checkFollowingStatus = async () => {
-            if (currentUser && userId && !isOwner) {
-                // We need to know if currentUser follows userId.
-                // Since we don't have a direct API for "isFollowing", we fetch current user's profile to see their following list.
-                // Optimization: In a real app, the profile API for 'userId' should return 'isFollowedByViewer'.
-                try {
-                    const myProfile = await userService.getProfile(currentUser.id || currentUser._id);
-                    const isFound = myProfile.user.following.some(f => (f._id || f) === userId);
-                    setIsFollowing(isFound);
-                } catch (e) {
-                    console.error("Error checking follow status", e);
-                }
-            }
-        };
-        checkFollowingStatus();
-    }, [userId, isOwner]);
-
     const handleFollowToggle = async () => {
         if (followLoading) return;
         setFollowLoading(true);
         try {
-            if (isFollowing) {
+            if (isFollowing || isRequested) {
+                // Unfollow or Withdraw Request
                 await userService.unfollowUser(userId);
+
+                const wasFollowing = isFollowing;
                 setIsFollowing(false);
-                setProfile(prev => ({
-                    ...prev,
-                    stats: { ...prev.stats, followers: Math.max(0, prev.stats.followers - 1) }
-                }));
-                toast.success("Unfollowed user");
+                setIsRequested(false);
+
+                // Only update count if actually following
+                if (wasFollowing) {
+                    setProfile(prev => ({
+                        ...prev,
+                        stats: { ...prev.stats, followers: Math.max(0, prev.stats.followers - 1) }
+                    }));
+                }
+                toast.success(isRequested ? "Request withdrawn" : "Unfollowed user");
             } else {
-                await userService.followUser(userId);
-                setIsFollowing(true);
-                setProfile(prev => ({
-                    ...prev,
-                    stats: { ...prev.stats, followers: prev.stats.followers + 1 }
-                }));
-                toast.success("Followed user");
+                // Follow
+                const response = await userService.followUser(userId);
+
+                if (response.status === 'requested') {
+                    setIsRequested(true);
+                    toast.success("Request sent");
+                } else {
+                    setIsFollowing(true);
+                    setProfile(prev => ({
+                        ...prev,
+                        stats: { ...prev.stats, followers: prev.stats.followers + 1 }
+                    }));
+                    toast.success("Followed user");
+                }
             }
         } catch (error) {
             console.error("Follow action failed", error);
@@ -101,13 +98,35 @@ const Profile = () => {
         if (!uid) return;
         try {
             const data = await userService.getProfile(uid);
-            setProfile(data.user);
+            const userProfile = data.user;
+            setProfile(userProfile);
+
+            // Sync Follow Status
+            const status = userProfile.followStatus;
+            const _isFollowing = status === 'following';
+            setIsFollowing(_isFollowing);
+            setIsRequested(status === 'requested');
+
+            // Determine if we should fetch posts
+            const storedUser = JSON.parse(localStorage.getItem('user'));
+            const _isOwner = storedUser && (uid === (storedUser.id || storedUser._id));
+
+            if (!_isOwner && userProfile.isPrivate && !_isFollowing) {
+                setLoading(false);
+            } else {
+                try {
+                    const postData = await userService.getUserPosts(uid);
+                    mergePosts(postData.posts);
+                    setPosts(postData.posts);
+                } catch (e) { console.error(e); }
+                setLoading(false);
+            }
         } catch (err) {
             console.error("Profile fetch error:", err);
             toast.error("Failed to load profile");
             setLoading(false);
         }
-    }, [toast]);
+    }, [toast, mergePosts]);
 
     // Fetch User Posts
     const fetchPosts = useCallback(async (uid) => {
@@ -118,8 +137,6 @@ const Profile = () => {
             setPosts(data.posts);
         } catch (err) {
             console.error("Posts fetch error:", err);
-        } finally {
-            setLoading(false);
         }
     }, [mergePosts]);
 
@@ -127,9 +144,8 @@ const Profile = () => {
         if (userId) {
             setLoading(true);
             fetchProfile(userId);
-            fetchPosts(userId);
         }
-    }, [userId, fetchProfile, fetchPosts]);
+    }, [userId, fetchProfile]);
 
 
 
@@ -201,14 +217,14 @@ const Profile = () => {
                                         <button
                                             className="btn-edit-profile"
                                             style={{
-                                                background: isFollowing ? 'transparent' : 'var(--color-primary)',
-                                                border: isFollowing ? '1px solid var(--color-border)' : 'none',
-                                                color: isFollowing ? 'var(--color-text-main)' : '#fff'
+                                                background: (isFollowing || isRequested) ? 'transparent' : 'var(--color-primary)',
+                                                border: (isFollowing || isRequested) ? '1px solid var(--color-border)' : 'none',
+                                                color: (isFollowing || isRequested) ? 'var(--color-text-main)' : '#fff'
                                             }}
                                             onClick={handleFollowToggle}
                                             disabled={followLoading}
                                         >
-                                            <span>{isFollowing ? 'Unfollow' : 'Follow'}</span>
+                                            <span>{isFollowing ? 'Unfollow' : (isRequested ? 'Requested' : 'Follow')}</span>
                                         </button>
                                     )}
                                 </div>
@@ -260,63 +276,74 @@ const Profile = () => {
                     </div>
 
                     {/* Content Tabs / Feed Section */}
-                    <div className="profile-content">
-                        <div className="content-tabs">
-                            <button
-                                className={`tab-btn active`}
-                            > Posts </button>
-                            <button className="tab-btn"> Media </button>
-                            <button className="tab-btn"> Likes </button>
+                    {/* Content Tabs / Feed Section */}
+                    {(profile.isPrivate && !isOwner && !isFollowing) ? (
+                        <div className="private-profile-view">
+                            <div className="private-icon-circle">
+                                <Lock size={32} />
+                            </div>
+                            <h2>This Account is Private</h2>
+                            <p>Follow to see their photos and videos.</p>
+                        </div>
+                    ) : (
+                        <div className="profile-content">
+                            <div className="content-tabs">
+                                <button
+                                    className={`tab-btn active`}
+                                > Posts </button>
+                                <button className="tab-btn"> Media </button>
+                                <button className="tab-btn"> Likes </button>
 
-                            <div className="view-toggle">
-                                <button
-                                    className={`toggle-icon ${viewMode === 'grid' ? 'active' : ''}`}
-                                    onClick={() => setViewMode('grid')}
-                                >
-                                    <Grid size={20} />
-                                </button>
-                                <button
-                                    className={`toggle-icon ${viewMode === 'list' ? 'active' : ''}`}
-                                    onClick={() => setViewMode('list')}
-                                >
-                                    <ListIcon size={20} />
-                                </button>
+                                <div className="view-toggle">
+                                    <button
+                                        className={`toggle-icon ${viewMode === 'grid' ? 'active' : ''}`}
+                                        onClick={() => setViewMode('grid')}
+                                    >
+                                        <Grid size={20} />
+                                    </button>
+                                    <button
+                                        className={`toggle-icon ${viewMode === 'list' ? 'active' : ''}`}
+                                        onClick={() => setViewMode('list')}
+                                    >
+                                        <ListIcon size={20} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className={`profile-feed ${viewMode}`}>
+                                {Array.isArray(posts) && posts.length > 0 ? (
+                                    viewMode === 'list' ? (
+                                        posts.map(post => {
+                                            // Check if post has media
+                                            const hasMedia = post.media && post.media.length > 0;
+
+                                            return (
+                                                <div key={post._id} className="feed-item-wrapper">
+                                                    {hasMedia ? (
+                                                        <PostCard post={post} onDelete={(deletedId) => setPosts(prev => prev.filter(p => p._id !== deletedId))} />
+                                                    ) : (
+                                                        <ProfilePostCard post={post} isOwner={isOwner} onDelete={(deletedId) => setPosts(prev => prev.filter(p => p._id !== deletedId))} />
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        posts.map(post => (
+                                            <GridItem
+                                                key={post._id}
+                                                post={post}
+                                                onClick={() => setSelectedPost(post)}
+                                            />
+                                        ))
+                                    )
+                                ) : (
+                                    <div className="empty-feed">
+                                        <p>No posts yet</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
-
-                        <div className={`profile-feed ${viewMode}`}>
-                            {Array.isArray(posts) && posts.length > 0 ? (
-                                viewMode === 'list' ? (
-                                    posts.map(post => {
-                                        // Check if post has media
-                                        const hasMedia = post.media && post.media.length > 0;
-
-                                        return (
-                                            <div key={post._id} className="feed-item-wrapper">
-                                                {hasMedia ? (
-                                                    <PostCard post={post} onDelete={(deletedId) => setPosts(prev => prev.filter(p => p._id !== deletedId))} />
-                                                ) : (
-                                                    <ProfilePostCard post={post} isOwner={isOwner} onDelete={(deletedId) => setPosts(prev => prev.filter(p => p._id !== deletedId))} />
-                                                )}
-                                            </div>
-                                        );
-                                    })
-                                ) : (
-                                    posts.map(post => (
-                                        <GridItem
-                                            key={post._id}
-                                            post={post}
-                                            onClick={() => setSelectedPost(post)}
-                                        />
-                                    ))
-                                )
-                            ) : (
-                                <div className="empty-feed">
-                                    <p>No posts yet</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    )}
 
                     <EditProfileModal
                         isOpen={isEditModalOpen}

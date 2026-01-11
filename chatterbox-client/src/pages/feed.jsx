@@ -174,4 +174,5 @@ const Feed = () => {
         </div >
     );
 };
+Feed.whyDidYouRender = true;
 export default Feed;

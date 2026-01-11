@@ -10,6 +10,12 @@ const MobileNavbar = () => {
     // Simple helper to check active
     const isActive = (path) => location.pathname === path;
 
+    const isProfileActive = () => {
+        const user = JSON.parse(localStorage.getItem('user'));
+        const myId = user ? (user.id || user._id) : null;
+        return location.pathname === '/profile' || (myId && location.pathname === `/profile/${myId}`);
+    };
+
     return (
         <div className="mobile-navbar">
             <div className="mobile-nav-container">
@@ -50,7 +56,7 @@ const MobileNavbar = () => {
                 </button>
 
                 <button
-                    className={`mobile-nav-item ${location.pathname.startsWith('/profile') ? 'active' : ''}`}
+                    className={`mobile-nav-item ${isProfileActive() ? 'active' : ''}`}
                     onClick={() => {
                         const user = JSON.parse(localStorage.getItem('user')) || {};
                         navigate(`/profile/${user.id || user._id}`);

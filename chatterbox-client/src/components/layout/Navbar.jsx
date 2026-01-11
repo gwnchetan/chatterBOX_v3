@@ -31,6 +31,9 @@ const Navbar = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    // Get user info from localStorage (fallback to default)
+    const user = JSON.parse(localStorage.getItem('user')) || { fullname: 'Cyndy Lillibridge', username: 'cyndyui' };
+
     // Determine active link based on current path
     const getActiveLink = (path) => {
         if (path === '/feed') return 'Feed';
@@ -39,9 +42,15 @@ const Navbar = () => {
         if (path === '/direct') return 'Direct';
         if (path === '/stats') return 'Stats';
         if (path === '/settings') return 'Settings';
-        if (path.startsWith('/profile')) return 'Profile';
         if (path === '/create') return 'Create';
-        return 'Feed'; // Default
+
+        // Exact match for my profile
+        const myId = user.id || user._id;
+        if (path === '/profile' || (myId && path === `/profile/${myId}`)) {
+            return 'Profile';
+        }
+
+        return '';
     };
 
     const activeLink = getActiveLink(location.pathname);
@@ -69,9 +78,6 @@ const Navbar = () => {
         localStorage.removeItem('user');
         navigate('/');
     };
-
-    // Get user info from localStorage (fallback to default)
-    const user = JSON.parse(localStorage.getItem('user')) || { fullname: 'Cyndy Lillibridge', username: 'cyndyui' };
 
     return (
         <nav className={`navbar ${isCollapsed ? 'collapsed' : ''}`}>

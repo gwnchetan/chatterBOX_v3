@@ -173,10 +173,11 @@ exports.updateProfile = async (req, res) => {
  */
 exports.followUser = async (req, res) => {
     try {
-        const { userId } = req.params; // Target user
-        const currentUserId = req.user._id;
+        let { userId } = req.params; // Target user
+        userId = userId.trim();
+        const currentUserId = req.user._id.toString();
 
-        if (userId === currentUserId.toString()) {
+        if (userId === currentUserId) {
             return res.status(400).json({ message: "You cannot follow yourself" });
         }
 

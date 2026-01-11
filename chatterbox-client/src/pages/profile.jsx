@@ -34,7 +34,8 @@ const Profile = () => {
     const [followLoading, setFollowLoading] = useState(false);
 
     const currentUser = JSON.parse(localStorage.getItem('user'));
-    const isOwner = currentUser && (userId === (currentUser.id || currentUser._id));
+    const currentUserId = currentUser ? (currentUser.id || currentUser._id) : null;
+    const isOwner = currentUserId && userId && (String(userId) === String(currentUserId));
 
     const handleFollowToggle = async () => {
         if (followLoading) return;

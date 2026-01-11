@@ -181,15 +181,6 @@ const Profile = () => {
                                 <div className="banner-placeholder"></div>
                             )}
                             <div className="view-toggle">
-                                {isOwner && (
-                                    <button
-                                        className="toggle-icon"
-                                        onClick={() => setIsSettingsOpen(true)}
-                                        style={{ marginRight: '8px' }}
-                                    >
-                                        <Settings size={20} />
-                                    </button>
-                                )}
                                 <button
                                     className={`toggle-icon ${viewMode === 'grid' ? 'active' : ''}`}
                                     onClick={() => setViewMode('grid')}
@@ -215,16 +206,25 @@ const Profile = () => {
                                         onError={(e) => { e.target.src = '/default-avatar.png'; }}
                                     />
                                 </div>
-                                <div className="profile-actions">
+                                <div className="profile-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                     {isOwner ? (
-                                        <button
-                                            className="btn-edit-profile"
-                                            style={{ color: 'var(--color-text-main)', background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
-                                            onClick={() => setIsEditModalOpen(true)}
-                                        >
-                                            <Edit3 size={18} />
-                                            <span>Edit Profile</span>
-                                        </button>
+                                        <>
+                                            <button
+                                                className="btn-edit-profile"
+                                                style={{ color: 'var(--color-text-main)', background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}
+                                                onClick={() => setIsEditModalOpen(true)}
+                                            >
+                                                <Edit3 size={18} />
+                                                <span>Edit Profile</span>
+                                            </button>
+                                            <button
+                                                className="btn-edit-profile"
+                                                style={{ padding: '12px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-main)' }}
+                                                onClick={() => setIsSettingsOpen(true)}
+                                            >
+                                                <Settings size={20} />
+                                            </button>
+                                        </>
                                     ) : (
                                         <button
                                             className="btn-edit-profile"

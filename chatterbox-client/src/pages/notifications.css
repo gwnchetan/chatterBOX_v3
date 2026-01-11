@@ -1,0 +1,52 @@
+.notifications-page-wrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 1rem;
+    padding-bottom: 80px;
+    /* For mobile nav */
+}
+
+.notif-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.notif-header h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.mark-read-btn-page {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    padding: 8px 12px;
+    border-radius: 20px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.mark-read-btn-page:hover {
+    background: var(--color-surface);
+    color: var(--color-text-main);
+    border-color: var(--color-text-secondary);
+}
+
+@media (min-width: 1100px) {
+    .notifications-page-wrapper {
+        margin: 0;
+        max-width: 100%;
+        padding-top: 2rem;
+    }
+}

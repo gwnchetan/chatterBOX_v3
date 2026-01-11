@@ -7,6 +7,7 @@ import Profile from './pages/profile'
 import Explore from './pages/explore'
 import Favorites from './pages/favorites'
 import WIP from './pages/wip'
+import NotificationsPage from './pages/notifications'
 import './App.css'
 import ProtectedRoute from './components/common/ProtectedRoute';
 
@@ -58,6 +59,11 @@ function App() {
           <Route path="/stats" element={
             <ProtectedRoute>
               <WIP title="Statistics" />
+            </ProtectedRoute>
+          } />
+          <Route path="/notifications" element={
+            <ProtectedRoute>
+              <NotificationsPage />
             </ProtectedRoute>
           } />
         </Routes>

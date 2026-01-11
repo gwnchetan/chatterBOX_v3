@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import './MobileNavbar.css';
-import { Home, Search, MessageSquare, User, Plus } from '../common/Icons';
+import { Home, Search, Bell, User, Plus } from '../common/Icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const MobileNavbar = () => {
@@ -41,11 +41,11 @@ const MobileNavbar = () => {
                 </button>
 
                 <button
-                    className={`mobile-nav-item ${isActive('/direct') ? 'active' : ''}`}
-                    onClick={() => navigate('/direct')}
+                    className={`mobile-nav-item ${isActive('/notifications') ? 'active' : ''}`}
+                    onClick={() => navigate('/notifications')}
                 >
                     <div className="icon-wrapper">
-                        <MessageSquare size={24} />
+                        <Bell size={24} />
                     </div>
                 </button>
 

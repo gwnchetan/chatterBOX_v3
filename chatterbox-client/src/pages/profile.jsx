@@ -3,10 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import userService from '../services/user.service';
 import PostCard from '../components/feed/PostCard';
 import ProfilePostCard from '../components/feed/ProfilePostCard';
-import { MapPin, Link as LinkIcon, Calendar, Edit3, Grid, List as ListIcon, Heart, MessageSquare, Lock } from '../components/common/Icons';
+import { MapPin, Link as LinkIcon, Calendar, Edit3, Grid, List as ListIcon, Heart, MessageSquare, Lock, Settings } from '../components/common/Icons';
 import { useToast } from '../components/Toast';
 import EditProfileModal from '../components/profile/EditProfileModal';
 import PostDetailModal from '../components/profile/PostDetailModal';
+import SettingsModal from '../components/common/SettingsModal';
 import Navbar from '../components/layout/Navbar';
 import MobileNavbar from '../components/layout/MobileNavbar';
 import './profile.css';
@@ -26,6 +27,7 @@ const Profile = () => {
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState('list'); // Default to list
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [selectedPost, setSelectedPost] = useState(null);
     const [isFollowing, setIsFollowing] = useState(false);
     const [isRequested, setIsRequested] = useState(false);
@@ -178,6 +180,15 @@ const Profile = () => {
                                 <div className="banner-placeholder"></div>
                             )}
                             <div className="view-toggle">
+                                {isOwner && (
+                                    <button
+                                        className="toggle-icon"
+                                        onClick={() => setIsSettingsOpen(true)}
+                                        style={{ marginRight: '8px' }}
+                                    >
+                                        <Settings size={20} />
+                                    </button>
+                                )}
                                 <button
                                     className={`toggle-icon ${viewMode === 'grid' ? 'active' : ''}`}
                                     onClick={() => setViewMode('grid')}
@@ -356,6 +367,7 @@ const Profile = () => {
                         post={selectedPost}
                         onClose={() => setSelectedPost(null)}
                     />
+                    <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
                 </div>
             </main>
 

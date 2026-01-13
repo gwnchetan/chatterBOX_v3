@@ -43,7 +43,14 @@ const PostCard = ({ post, onDelete }) => {
     const reposted = finalPost.reposted || false;
     const repostCount = finalPost.repostCount || 0;
     const saved = finalPost.saved || false;
-    const commentCount = finalPost.commentCount || 0;
+
+    // Local state for comment count to allow immediate UI updates without waiting for re-fetch
+    const [postCommentCount, setPostCommentCount] = useState(finalPost.commentCount || 0);
+
+    // Sync local state with prop/context updates
+    useEffect(() => {
+        setPostCommentCount(finalPost.commentCount || 0);
+    }, [finalPost.commentCount]);
 
     const [showComments, setShowComments] = useState(false);
     const [comments, setComments] = useState([]);
@@ -100,7 +107,7 @@ const PostCard = ({ post, onDelete }) => {
         try {
             const newComment = await postsService.addComment(displayPost._id, commentText);
             setComments(prev => [...prev, newComment]);
-            setCommentCount(prev => prev + 1);
+            setPostCommentCount(prev => prev + 1);
             setCommentText('');
         } catch (error) {
             console.error(error);
@@ -114,7 +121,7 @@ const PostCard = ({ post, onDelete }) => {
         try {
             await postsService.deleteComment(displayPost._id, commentId);
             setComments(prev => prev.filter(c => c._id !== commentId));
-            setCommentCount(prev => prev - 1);
+            setPostCommentCount(prev => Math.max(0, prev - 1));
         } catch (error) {
             console.error(error);
             toast.error("Failed to delete comment");
@@ -381,7 +388,7 @@ const PostCard = ({ post, onDelete }) => {
                     <div className="icon-container">
                         <MessageSquare />
                     </div>
-                    <span>{commentCount}</span>
+                    <span>{postCommentCount}</span>
                 </button>
 
                 <button className="action-item" onClick={handleRepost}>

@@ -135,11 +135,20 @@ const Profile = () => {
     const fetchPosts = useCallback(async (uid) => {
         if (!uid) return;
         try {
+            console.log(`[Profile] Fetching posts for user: ${uid}`);
             const data = await userService.getUserPosts(uid);
-            mergePosts(data.posts);
-            setPosts(data.posts);
+            console.log("[Profile] Posts Data received:", data);
+
+            if (data && Array.isArray(data.posts)) {
+                mergePosts(data.posts);
+                setPosts(data.posts);
+            } else {
+                console.error("[Profile] Invalid posts format received", data);
+                setPosts([]);
+            }
         } catch (err) {
-            console.error("Posts fetch error:", err);
+            console.error("[Profile] Posts fetch error:", err);
+            setPosts([]);
         }
     }, [mergePosts]);
 

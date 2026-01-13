@@ -126,9 +126,10 @@
 
 .profile-info-container {
     padding: 0 40px 40px;
-    margin-top: -60px;
+    margin-top: -80px;
     position: relative;
     backdrop-filter: blur(10px);
+    z-index: 10;
 }
 
 .profile-avatar-row {
@@ -139,13 +140,15 @@
 }
 
 .profile-avatar-wrapper {
-    width: 140px;
-    height: 140px;
+    width: 160px;
+    height: 160px;
     border-radius: 50%;
     border: 6px solid var(--color-bg);
     overflow: hidden;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
     background: var(--surface-bg, var(--color-surface));
+    position: relative;
+    z-index: 20;
 }
 
 .profile-avatar {

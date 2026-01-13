@@ -67,7 +67,8 @@ exports.getUserProfile = async (req, res) => {
  */
 exports.getUserPosts = async (req, res) => {
     try {
-        const { userId } = req.params;
+        const { userId: rawUserId } = req.params;
+        const userId = rawUserId.trim();
         const { cursor, limit = 12 } = req.query;
         // Check current user from request (middleware populates this)
         const currentUserId = req.user ? req.user._id.toString() : null;
@@ -78,13 +79,14 @@ exports.getUserPosts = async (req, res) => {
         if (!targetUser) return res.status(404).json({ message: 'User not found' });
 
         // Privacy Check
-        // If user is private AND requester is not the user themselves check following status
+        // If user is private AND requester is not the user themselves
         if (targetUser.isPrivate && (!currentUserId || userId !== currentUserId)) {
-            // Check if current user is follows targetUser
+            // Check if current user follows targetUser
             const currentUser = await User.findById(currentUserId);
-            const isFollowing = currentUser && currentUser.following.includes(userId);
+            const isFollowing = currentUser && currentUser.following.some(id => id.toString() === userId);
 
             if (!isFollowing) {
+                console.log(`Access Denied: User ${currentUserId} tried to access private posts of ${userId}`);
                 return res.status(403).json({ message: 'This account is private', isPrivate: true });
             }
         }

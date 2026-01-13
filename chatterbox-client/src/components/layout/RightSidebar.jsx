@@ -3,6 +3,7 @@ import { socketService } from '../../services/socket.service';
 import { notificationService } from '../../services/notification.service';
 import NotificationItem from '../notifications/NotificationItem';
 import '../notifications/notifications.css';
+import './Layout.css';
 import { Bell, Plus } from '../common/Icons';
 
 const RightSidebar = () => {

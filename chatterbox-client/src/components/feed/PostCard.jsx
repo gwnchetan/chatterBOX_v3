@@ -8,6 +8,7 @@ import { useToast } from '../Toast';
 import ConfirmModal from '../common/ConfirmModal';
 import VideoPlayer from './VideoPlayer';
 import './PostCard.css';
+import { useNavigate } from 'react-router-dom';
 
 // Helper to format text with mentions
 const formatCommentText = (text) => {
@@ -22,6 +23,7 @@ const formatCommentText = (text) => {
 };
 
 const PostCard = ({ post, onDelete }) => {
+    const navigate = useNavigate();
     const { toggleLike, toggleRepost, toggleSave, getPost } = useFeed();
     const isRepost = !!(post.repostOf && typeof post.repostOf === 'object');
     // We try to get the realtime state of the display post from the store if it exists (for shared state)
@@ -313,16 +315,32 @@ const PostCard = ({ post, onDelete }) => {
     const authorHandle = displayPost.author?.username ? `@${displayPost.author.username}` : '';
     const authorAvatar = displayPost.author?.avatar || '';
 
+    const handleProfileClick = (e) => {
+        e.stopPropagation();
+        const authorId = displayPost.author?._id || displayPost.author;
+        if (authorId) {
+            navigate(`/profile/${authorId}`);
+        }
+    };
+
+    const handleRepostProfileClick = (e) => {
+        e.stopPropagation();
+        const reposterId = post.author?._id || post.author;
+        if (reposterId) {
+            navigate(`/profile/${reposterId}`);
+        }
+    };
+
     return (
         <article className="post-card" ref={cardRef}>
             {isRepost && (
                 <div className="repost-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px 8px', fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '600' }}>
                     <Repeat size={14} />
-                    <span>{post.author?.fullname} Reposted</span>
+                    <span onClick={handleRepostProfileClick} style={{ cursor: 'pointer' }}>{post.author?.fullname} Reposted</span>
                 </div>
             )}
             <div className="post-header">
-                <div className="post-meta">
+                <div className="post-meta" onClick={handleProfileClick} style={{ cursor: 'pointer' }}>
                     <Avatar src={authorAvatar} alt={authorName} status="online" size="md" />
                     <div className="meta-text">
                         <div className="meta-top">

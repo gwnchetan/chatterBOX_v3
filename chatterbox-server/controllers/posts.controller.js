@@ -200,7 +200,8 @@ exports.getFeed = async (req, res) => {
             .populate({
                 path: 'repostOf',
                 populate: { path: 'author', select: 'username fullname avatar isPrivate' }
-            });
+            })
+            .lean();
 
         const validPosts = [];
         const followingStr = currentUser.following.map(id => id.toString());
@@ -250,15 +251,15 @@ exports.getFeed = async (req, res) => {
         const postIds = validPosts.map(p => p._id);
 
         const [userLikes, userReposts] = await Promise.all([
-            Like.find({ post: { $in: postIds }, user: userId }).select('post'),
-            Post.find({ repostOf: { $in: postIds }, author: userId }).select('repostOf')
+            Like.find({ post: { $in: postIds }, user: userId }).select('post').lean(),
+            Post.find({ repostOf: { $in: postIds }, author: userId }).select('repostOf').lean()
         ]);
 
         const likedPostIds = new Set(userLikes.map(l => l.post.toString()));
         const repostedPostIds = new Set(userReposts.map(r => r.repostOf.toString()));
 
         const hydratedPosts = validPosts.map(post => {
-            const p = post.toObject();
+            const p = post;
             return {
                 ...p,
                 liked: likedPostIds.has(p._id.toString()),
@@ -350,7 +351,8 @@ exports.searchPosts = async (req, res) => {
         })
             .sort({ createdAt: -1 })
             .limit(parseInt(limit))
-            .populate('author', 'username fullname avatar isPrivate');
+            .populate('author', 'username fullname avatar isPrivate')
+            .lean();
 
         const posts = rawPosts.filter(p => !p.author.isPrivate);
 
@@ -445,7 +447,7 @@ exports.addComment = async (req, res) => {
         await Post.findByIdAndUpdate(postId, { $inc: { commentCount: 1 } });
 
         // Build response with author info for immediate UI update
-        const fullComment = await Comment.findById(newComment._id).populate('user', 'username fullname avatar');
+        const fullComment = await Comment.findById(newComment._id).populate('user', 'username fullname avatar').lean();
 
         try {
             getIo().to(`post:${postId}`).emit('post:comment:update', {
@@ -486,7 +488,8 @@ exports.getComments = async (req, res) => {
         const postId = req.params.id;
         const comments = await Comment.find({ post: postId })
             .sort({ createdAt: 1 }) // Oldest first (Thread style)
-            .populate('user', 'username fullname avatar');
+            .populate('user', 'username fullname avatar')
+            .lean();
 
         res.json(comments);
     } catch (error) {

@@ -23,4 +23,8 @@ const userSchema = new mongoose.Schema({
     isPrivate: { type: Boolean, default: false }
 });
 
+// Indexes
+userSchema.index({ username: 'text', fullname: 'text' }); // Text search
+userSchema.index({ username: 1 }); // Exact match lookup
+
 module.exports = mongoose.model("User", userSchema);

@@ -11,10 +11,19 @@ const NotificationItem = ({ notification }) => {
     const toast = useToast();
     const [actionStatus, setActionStatus] = useState(null);
 
+    // Robust ID extraction
+    const senderId = sender?._id || sender?.id;
+
     const handleAccept = async (e) => {
         e.stopPropagation();
+        if (!senderId) {
+            console.error("Notification missing sender ID:", notification);
+            toast.error("Error: Invalid request data");
+            return;
+        }
+
         try {
-            await userService.acceptFollowRequest(sender._id);
+            await userService.acceptFollowRequest(senderId);
             setActionStatus('accepted');
             toast.success("Request accepted");
         } catch (err) {
@@ -25,8 +34,10 @@ const NotificationItem = ({ notification }) => {
 
     const handleReject = async (e) => {
         e.stopPropagation();
+        if (!senderId) return;
+
         try {
-            await userService.rejectFollowRequest(sender._id);
+            await userService.rejectFollowRequest(senderId);
             setActionStatus('rejected');
             toast.success("Request rejected");
         } catch (err) {
@@ -93,7 +104,7 @@ const NotificationItem = ({ notification }) => {
 
             {/* Avatar with Badge */}
             <div className="notif-avatar-wrapper" onClick={(e) => e.stopPropagation()}>
-                <Link to={`/profile/${sender._id}`}>
+                <Link to={`/profile/${senderId}`}>
                     <Avatar src={sender.avatar} size="md" />
                 </Link>
                 <div className="notif-icon-badge" style={{ backgroundColor: getIconBgColor() }}>
@@ -108,7 +119,7 @@ const NotificationItem = ({ notification }) => {
                         className="notif-user"
                         onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/profile/${sender._id}`);
+                            navigate(`/profile/${senderId}`);
                         }}
                     >
                         {sender.fullname || sender.username}

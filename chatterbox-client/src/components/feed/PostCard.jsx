@@ -490,6 +490,4 @@ const PostCard = ({ post, onDelete }) => {
     );
 };
 
-PostCard.whyDidYouRender = true;
-
 export default PostCard;

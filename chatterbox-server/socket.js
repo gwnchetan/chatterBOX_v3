@@ -58,6 +58,23 @@ const initSocket = (server) => {
             }
         });
 
+        // Join specific chat room (chat:{conversationId})
+        socket.on('join_chat', (conversationId) => {
+            if (conversationId) {
+                const roomName = `chat:${conversationId}`;
+                socket.join(roomName);
+                // console.log(`User ${socket.user.id} joined chat ${roomName}`);
+            }
+        });
+
+        // Leave specific chat room
+        socket.on('leave_chat', (conversationId) => {
+            if (conversationId) {
+                const roomName = `chat:${conversationId}`;
+                socket.leave(roomName);
+            }
+        });
+
         socket.on('disconnect', () => {
             // console.log('User disconnected');
         });

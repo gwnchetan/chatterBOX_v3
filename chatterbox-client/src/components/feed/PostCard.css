@@ -1,5 +1,350 @@
 /* PostCard.css */
 
+/* --- MOVED FROM FEED.CSS --- */
+
+/* Ensure the card itself is strictly contained */
+.post-card {
+    width: 100%;
+    max-width: 100%;
+    background-color: var(--color-surface) !important;
+    border-radius: 24px;
+    border: none;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    margin-bottom: 24px;
+}
+
+/* Header polishing */
+.post-header {
+    padding: 16px 20px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.post-meta {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+/* Enforce avatar constraints just in case */
+.post-meta .avatar-container {
+    flex-shrink: 0;
+}
+
+.meta-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.meta-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.meta-top h4 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-text-main);
+}
+
+.meta-dot {
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+}
+
+.meta-time {
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+}
+
+.meta-handle {
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+}
+
+.post-options {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+}
+
+.post-options:hover {
+    background-color: var(--color-bg);
+    color: var(--color-text-main);
+}
+
+/* Content Text */
+.post-content-text {
+    padding: 0 20px 12px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--color-text-main);
+}
+
+/* --- POST IMAGE SLIDER (Instagram-like) --- */
+.post-slider-wrapper {
+    position: relative;
+    width: 100%;
+    /* Aspect ratio controlled via inline style from metadata */
+    aspect-ratio: auto;
+    min-height: 320px;
+    max-height: 600px;
+    /* Reduced from 85vh for shorter cards */
+    background-color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.reel-video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    /* Critical: Video pads itself inside container */
+    display: block;
+}
+
+.post-slider-track {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.post-slider-track::-webkit-scrollbar {
+    display: none;
+}
+
+.slider-item {
+    flex: 0 0 100%;
+    height: 100%;
+    scroll-snap-align: center;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+}
+
+.slider-item img {
+    max-width: 100%;
+    width: 100%;
+    height: 100%;
+    /* Prevent cropping */
+    object-fit: contain;
+    display: block;
+}
+
+.slider-dots {
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.slider-dot {
+    width: 6px;
+    height: 6px;
+    background-color: rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.slider-dot.active {
+    background-color: #fff;
+    transform: scale(1.2);
+}
+
+.slider-counter {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 600;
+    z-index: 10;
+}
+
+/* Navigation Arrows */
+.slider-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+    color: #000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s;
+    opacity: 0;
+    /* Hidden by default */
+}
+
+.post-slider-wrapper:hover .slider-arrow {
+    opacity: 1;
+    /* Show on hover */
+}
+
+.slider-arrow:hover {
+    background-color: #fff;
+    transform: translateY(-50%) scale(1.1);
+}
+
+.slider-arrow-left {
+    left: 10px;
+}
+
+.slider-arrow-right {
+    right: 10px;
+}
+
+/* THE GRID OF IMAGES */
+.post-hover-grid {
+    display: flex;
+    width: 100%;
+    height: 350px;
+    /* Fixed height for consistency */
+    gap: 2px;
+    /* Tiny gap for crisp look */
+    background-color: #000;
+}
+
+/* Individual Image Container */
+.hover-image-item {
+    flex: 1;
+    /* Distribute evenly */
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+    min-width: 0;
+    /* Allow shrinking below content size */
+    transition: flex 0.4s ease;
+}
+
+/* Actual Image */
+.hover-image-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* Crop to fill, never squash */
+    display: block;
+    transition: transform 0.6s ease;
+}
+
+/* Hover Interaction: Expand one, shrink others */
+.post-hover-grid:hover .hover-image-item {
+    flex: 0.5;
+    /* Shrink unfocused */
+    filter: brightness(0.6);
+    /* Dim others */
+}
+
+.post-hover-grid .hover-image-item:hover {
+    flex: 3;
+    /* Grow focused significantly */
+    filter: brightness(1);
+    /* Highlight */
+}
+
+.post-hover-grid .hover-image-item:hover img {
+    transform: scale(1.05);
+    /* Zoom effect */
+}
+
+/* Single Image Case */
+.hover-grid-one {
+    height: auto;
+    /* Let it scale naturally */
+    max-height: 600px;
+    display: block;
+}
+
+.hover-grid-one .hover-image-item {
+    width: 100%;
+    height: 100%;
+}
+
+/* Stats/Actions Bar */
+.post-actions-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-top: none;
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+}
+
+.action-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: color 0.2s;
+    padding: 0;
+}
+
+.action-item:hover {
+    color: var(--color-text-main);
+}
+
+.icon-container {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 1.2rem;
+}
+
+.icon-container.liked {
+    color: #ef4444;
+    /* Heart Red */
+}
+
+.heart-filled {
+    fill: #ef4444;
+}
+
+/* --- END OF MOVED STYLES --- */
+
+
 .post-card .comments-section {
     border-top: 1px solid var(--border);
     margin-top: 10px;

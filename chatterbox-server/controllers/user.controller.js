@@ -18,7 +18,8 @@ exports.getUserProfile = async (req, res) => {
 
         const user = await User.findById(userId)
             .select('-password -email -blockedUsers')
-            .populate('following', 'username fullname avatar');
+            .populate('following', 'username fullname avatar')
+            .lean();
 
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
@@ -29,10 +30,10 @@ exports.getUserProfile = async (req, res) => {
         if (req.user) {
             const currentUserId = req.user._id.toString();
             // Check followers list (assuming we maintain it now) OR checking current user's following list
-            const currentUser = await User.findById(currentUserId).select('following');
-            if (currentUser.following.includes(userId)) {
+            const currentUser = await User.findById(currentUserId).select('following').lean();
+            if (currentUser.following.find(f => f.toString() === userId)) {
                 followStatus = 'following';
-            } else if (user.followRequests && user.followRequests.includes(currentUserId)) {
+            } else if (user.followRequests && user.followRequests.find(id => id.toString() === currentUserId)) {
                 followStatus = 'requested';
             }
         }
@@ -45,7 +46,7 @@ exports.getUserProfile = async (req, res) => {
 
         res.json({
             user: {
-                ...user.toObject(),
+                ...user,
                 followStatus,
                 stats: {
                     posts: postCount,
@@ -111,7 +112,8 @@ exports.getUserPosts = async (req, res) => {
         const posts = await Post.find(query)
             .sort({ createdAt: -1, _id: -1 })
             .limit(limitNum)
-            .populate('author', 'username fullname avatar');
+            .populate('author', 'username fullname avatar')
+            .lean();
 
         let nextCursor = null;
         if (posts.length === limitNum) {
@@ -193,6 +195,7 @@ exports.followUser = async (req, res) => {
             return res.status(400).json({ message: "Already following", status: 'following' });
         }
 
+        // ... (at followUser)
         // 1. Private Account Logic
         if (targetUser.isPrivate) {
             if (targetUser.followRequests && targetUser.followRequests.includes(currentUserId)) {
@@ -204,17 +207,34 @@ exports.followUser = async (req, res) => {
                 $addToSet: { followRequests: currentUserId }
             });
 
-            // Notification
-            const notif = new Notification({
+            // Notification (Prevent Duplicate)
+            const existingNotif = await Notification.findOne({
                 recipient: userId,
                 sender: currentUserId,
-                type: 'request'
+                type: 'request',
+                read: false
             });
-            await notif.save();
-            await notif.populate('sender', 'username fullname avatar');
-            try {
-                getIo().to(`user:${userId}`).emit('notification:new', notif);
-            } catch (e) { console.error("Socket emit fail", e); }
+
+            if (existingNotif) {
+                // Just update timestamp
+                existingNotif.createdAt = new Date();
+                await existingNotif.save();
+                // Re-emit for real-time bump
+                try {
+                    getIo().to(`user:${userId}`).emit('notification:new', existingNotif);
+                } catch (e) { console.error("Socket emit fail", e); }
+            } else {
+                const notif = new Notification({
+                    recipient: userId,
+                    sender: currentUserId,
+                    type: 'request'
+                });
+                await notif.save();
+                await notif.populate('sender', 'username fullname avatar');
+                try {
+                    getIo().to(`user:${userId}`).emit('notification:new', notif);
+                } catch (e) { console.error("Socket emit fail", e); }
+            }
 
             return res.json({ message: "Follow request sent", status: 'requested' });
         }
@@ -225,17 +245,32 @@ exports.followUser = async (req, res) => {
             User.findByIdAndUpdate(userId, { $addToSet: { followers: currentUserId } })
         ]);
 
-        // Notification
-        const notif = new Notification({
+        // Notification (Prevent Duplicate)
+        const existingNotif = await Notification.findOne({
             recipient: userId,
             sender: currentUserId,
-            type: 'follow'
+            type: 'follow',
+            read: false
         });
-        await notif.save();
-        await notif.populate('sender', 'username fullname avatar');
-        try {
-            getIo().to(`user:${userId}`).emit('notification:new', notif);
-        } catch (e) { console.error("Socket emit fail", e); }
+
+        if (existingNotif) {
+            existingNotif.createdAt = new Date();
+            await existingNotif.save();
+            try {
+                getIo().to(`user:${userId}`).emit('notification:new', existingNotif);
+            } catch (e) { console.error("Socket emit fail", e); }
+        } else {
+            const notif = new Notification({
+                recipient: userId,
+                sender: currentUserId,
+                type: 'follow'
+            });
+            await notif.save();
+            await notif.populate('sender', 'username fullname avatar');
+            try {
+                getIo().to(`user:${userId}`).emit('notification:new', notif);
+            } catch (e) { console.error("Socket emit fail", e); }
+        }
 
         res.json({ message: "Followed successfully", status: 'following' });
     } catch (error) {
@@ -259,6 +294,9 @@ exports.unfollowUser = async (req, res) => {
                 $pull: { followers: currentUserId, followRequests: currentUserId }
             })
         ]);
+
+        // Optional: Remove relevant notifications if you want to be super clean
+        // await Notification.deleteMany({ sender: currentUserId, recipient: userId, type: { $in: ['follow', 'request'] } });
 
         res.json({ message: "Unfollowed successfully", status: 'none' });
     } catch (error) {
@@ -295,11 +333,18 @@ exports.acceptFollowRequest = async (req, res) => {
             })
         ]);
 
-        // Send Notification to Requester
+        // Clean up the request notification
+        await Notification.deleteMany({
+            recipient: currentUserId,
+            sender: requesterId,
+            type: 'request'
+        });
+
+        // Send Notification to Requester (Accepted)
         const notif = new Notification({
             recipient: requesterId,
             sender: currentUserId,
-            type: 'follow',
+            type: 'follow', // Or a new type 'accepted'
             text: 'accepted your follow request'
         });
         await notif.save();
@@ -307,6 +352,12 @@ exports.acceptFollowRequest = async (req, res) => {
 
         try {
             getIo().to(`user:${requesterId}`).emit('notification:new', notif);
+
+            // Emit special event for real-time status update on their profile page
+            getIo().to(`user:${requesterId}`).emit('user:follow_status_update', {
+                targetUserId: currentUserId,
+                status: 'following'
+            });
         } catch (e) { console.error(e) }
 
         res.json({ message: "Request accepted" });
@@ -329,6 +380,21 @@ exports.rejectFollowRequest = async (req, res) => {
         await User.findByIdAndUpdate(currentUserId, {
             $pull: { followRequests: requesterId }
         });
+
+        // Clean up the request notification
+        await Notification.deleteMany({
+            recipient: currentUserId,
+            sender: requesterId,
+            type: 'request'
+        });
+
+        // Emit special event for real-time status update (back to none/follow)
+        try {
+            getIo().to(`user:${requesterId}`).emit('user:follow_status_update', {
+                targetUserId: currentUserId,
+                status: 'none'
+            });
+        } catch (e) { console.error(e) }
 
         res.json({ message: "Request rejected" });
     } catch (error) {
@@ -399,7 +465,7 @@ exports.getSavedPosts = async (req, res) => {
         const user = await User.findById(userId).populate({
             path: 'savedPosts',
             populate: { path: 'author', select: 'username fullname avatar' }
-        });
+        }).lean();
 
         // Filter out null/deleted posts
         const posts = user.savedPosts.filter(p => p && !p.isDeleted).reverse();

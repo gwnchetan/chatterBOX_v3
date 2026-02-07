@@ -84,9 +84,10 @@ const postSchema = new mongoose.Schema({
 });
 
 // Indexes for performance and feed logic
-postSchema.index({ author: 1, createdAt: -1 });
-postSchema.index({ visibility: 1, createdAt: -1 });
-postSchema.index({ isDeleted: 1, createdAt: -1 });
+// Indexes for performance and feed logic
+postSchema.index({ author: 1, createdAt: -1 }); // User profile feed
+postSchema.index({ visibility: 1, createdAt: -1 }); // Global feed
+postSchema.index({ isDeleted: 1 }); // Filter deleted
 
 // Partial index for engagement score (ignore private or deleted posts)
 postSchema.index(

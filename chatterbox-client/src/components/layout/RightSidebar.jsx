@@ -51,7 +51,13 @@ const RightSidebar = () => {
                 console.error("Audio error:", e);
             }
 
-            setNotifications(prev => [notif, ...prev]);
+            setNotifications(prev => {
+                // Prevent duplicate notifications in UI
+                if (prev.some(n => n._id === notif._id)) {
+                    return prev;
+                }
+                return [notif, ...prev];
+            });
             setUnreadCount(prev => prev + 1);
         };
 

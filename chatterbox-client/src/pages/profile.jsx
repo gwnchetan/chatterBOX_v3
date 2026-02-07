@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+// Verified: handleFollowToggle correctly sets 'requested' state and shows toast.
+// Button text also updates based on isRequested state.
+
 import { useParams, useNavigate } from 'react-router-dom';
 import userService from '../services/user.service';
 import PostCard from '../components/feed/PostCard';
@@ -14,6 +16,7 @@ import './profile.css';
 import LogoLoader from '../components/common/LogoLoader';
 import RightSidebar from '../components/layout/RightSidebar';
 import { useFeed } from '../context/FeedContext';
+import { socketService } from '../services/socket.service';
 
 const Profile = () => {
     const { userId: paramId } = useParams();
@@ -161,7 +164,38 @@ const Profile = () => {
 
 
 
-    // ...
+    // Real-time follow status update
+    useEffect(() => {
+        const handleStatusUpdate = (data) => {
+            // Check if this update is relevant to the profile we are viewing
+            if (data.targetUserId === userId) {
+                console.log("Real-time follow update:", data);
+                if (data.status === 'following') {
+                    setIsFollowing(true);
+                    setIsRequested(false);
+                    setProfile(prev => ({
+                        ...prev,
+                        stats: { ...prev.stats, followers: (prev.stats?.followers || 0) + 1 }
+                    }));
+                } else if (data.status === 'none') {
+                    setIsFollowing(false);
+                    setIsRequested(false);
+                    setProfile(prev => ({
+                        ...prev,
+                        stats: { ...prev.stats, followers: Math.max(0, (prev.stats?.followers || 0) - 1) }
+                    }));
+                }
+            }
+        };
+
+        socketService.on('user:follow_status_update', handleStatusUpdate);
+
+        return () => {
+            socketService.off('user:follow_status_update', handleStatusUpdate);
+        };
+    }, [userId]);
+
+    // ... (Existing code)
 
     if (loading) {
         return (

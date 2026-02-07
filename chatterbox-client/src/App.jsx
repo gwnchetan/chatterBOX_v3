@@ -14,7 +14,16 @@ const Favorites = lazy(() => import('./pages/favorites'));
 const WIP = lazy(() => import('./pages/wip'));
 const NotificationsPage = lazy(() => import('./pages/notifications'));
 
+import { socketService } from './services/socket.service';
+
 function App() {
+  React.useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user && localStorage.getItem('token')) {
+      socketService.connect();
+    }
+  }, []);
+
   return (
     <div className="app-container">
       <FeedProvider>

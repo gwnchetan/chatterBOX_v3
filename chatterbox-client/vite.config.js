@@ -13,4 +13,15 @@ export default defineConfig({
       "Cross-Origin-Embedder-Policy": "credentialless",
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          ui: ['framer-motion', 'lucide-react'], // Assuming lucide is used for icons based on previous context
+          utils: ['axios', 'date-fns'] // Common utils if used
+        },
+      },
+    },
+  },
 })

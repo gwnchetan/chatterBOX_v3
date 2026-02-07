@@ -9,6 +9,7 @@ const authMiddleware = require('../middleware/auth.middleware'); // Assuming it 
 // Search (Must be before /:userId)
 router.get('/search', authMiddleware, userController.searchUsers);
 router.get('/saved', authMiddleware, userController.getSavedPosts); // Get my saved posts
+router.get('/following', authMiddleware, userController.getFollowing); // Get users I follow
 
 // Save/Unsave actions (Must be before /:userId)
 router.post('/save/:postId', authMiddleware, userController.savePost);

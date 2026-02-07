@@ -1,5 +1,6 @@
 const Conversation = require('../models/conversations');
 const Message = require('../models/messages');
+const User = require('../models/users');
 const { canChat } = require('../utils/chatPermissions');
 const { getIo } = require('../socket');
 
@@ -31,25 +32,48 @@ exports.initiateConversation = async (req, res) => {
 
         if (!targetUserId) return res.status(400).json({ message: "Target user required" });
 
-        // 1. Check Permissions
+        // 1. Check Permissions (Blocking only)
         await canChat(currentUserId, targetUserId);
 
         // 2. Find Existing Conversation
-        // Invariant: One conversation per pair.
-        // We use $all to find conversation with exactly these 2 participants.
         let conversation = await Conversation.findOne({
             participants: { $all: [currentUserId, targetUserId], $size: 2 }
-        }).populate('participants', 'username fullname avatar');
+        }).populate('participants', 'username fullname avatar isPrivate');
 
-        // 3. Create if not exists
-        if (!conversation) {
-            conversation = new Conversation({
-                participants: [currentUserId, targetUserId],
-                lastMessage: null
-            });
-            await conversation.save();
-            await conversation.populate('participants', 'username fullname avatar');
+        if (conversation) {
+            return res.json(conversation);
         }
+
+        // 3. Check Privacy for New Conversation
+        const targetUser = await User.findById(targetUserId);
+        const currentUser = await User.findById(currentUserId);
+
+        // Determine Status
+        let status = 'active';
+        let requestedBy = null;
+
+        // If target is private and NOT following current user (and current user not following target?)
+        // Simplified: If target is private, it's a request, unless they follow each other.
+        // Actually, if I follow them (and they accepted), I can chat.
+        // If I DON'T follow them, or they are private and I am not in their followers list.
+
+        const isFollowingTarget = currentUser.following.includes(targetUserId);
+
+        if (targetUser.isPrivate && !isFollowingTarget) {
+            status = 'pending';
+            requestedBy = currentUserId;
+        }
+
+        // 4. Create
+        conversation = new Conversation({
+            participants: [currentUserId, targetUserId],
+            lastMessage: null,
+            status,
+            requestedBy
+        });
+
+        await conversation.save();
+        await conversation.populate('participants', 'username fullname avatar isPrivate');
 
         res.json(conversation);
 
@@ -220,6 +244,68 @@ exports.markAsRead = async (req, res) => {
         res.json({ message: "Marked as read" });
     } catch (error) {
         console.error("Mark Read Error:", error);
+        res.status(500).json({ message: "Server Error" });
+    }
+};
+
+/**
+ * Accept Chat Request
+ * POST /api/chat/request/:conversationId/accept
+ */
+exports.acceptChatRequest = async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const userId = req.user._id;
+
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+
+        // Verify it is pending and user is NOT the requester
+        if (conversation.status !== 'pending') {
+            return res.status(400).json({ message: "Conversation is not pending" });
+        }
+        if (conversation.requestedBy.toString() === userId.toString()) {
+            return res.status(400).json({ message: "Cannot accept your own request" });
+        }
+
+        conversation.status = 'active';
+        conversation.requestedBy = undefined; // Clear it
+        await conversation.save();
+
+        res.json({ message: "Request accepted", conversation });
+
+    } catch (error) {
+        console.error("Accept Request Error:", error);
+        res.status(500).json({ message: "Server Error" });
+    }
+};
+
+/**
+ * Reject Chat Request
+ * POST /api/chat/request/:conversationId/reject
+ */
+exports.rejectChatRequest = async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const userId = req.user._id;
+
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+
+        if (conversation.status !== 'pending') {
+            return res.status(400).json({ message: "Conversation is not pending" });
+        }
+
+        // Allow rejection by recipient OR cancellation by requester
+        // But requestedBy logic usually implies recipient rejects.
+
+        conversation.status = 'rejected';
+        await conversation.save();
+
+        res.json({ message: "Request rejected" });
+
+    } catch (error) {
+        console.error("Reject Request Error:", error);
         res.status(500).json({ message: "Server Error" });
     }
 };

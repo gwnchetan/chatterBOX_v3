@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import userService from '../services/user.service';
+import chatService from '../services/chat.service';
 import PostCard from '../components/feed/PostCard';
 import ProfilePostCard from '../components/feed/ProfilePostCard';
 import { MapPin, Link as LinkIcon, Calendar, Edit3, Grid, List as ListIcon, Heart, MessageSquare, Lock, Settings } from '../components/common/Icons';
@@ -80,27 +81,54 @@ const Profile = () => {
     const isRequested = profile?.followStatus === 'requested';
 
     const handleFollowToggle = async () => {
-        if (followLoading) return;
+        if (!profile) return;
+        if (followLoading) return; // Prevent multiple clicks
         setFollowLoading(true);
+
+        // Optimistic Update
+        const previousProfile = queryClient.getQueryData(['profile', targetUserId]);
+        queryClient.setQueryData(['profile', targetUserId], old => {
+            if (!old) return old;
+            const newFollowStatus = old.followStatus === 'following' ? null : (old.isPrivate ? 'requested' : 'following');
+            const newFollowersCount = old.followStatus === 'following' ? old.stats.followers - 1 : old.stats.followers + 1;
+            return {
+                ...old,
+                followStatus: newFollowStatus,
+                stats: {
+                    ...old.stats,
+                    followers: newFollowersCount
+                }
+            };
+        });
+
         try {
             if (isFollowing || isRequested) {
                 await userService.unfollowUser(targetUserId);
-                queryClient.invalidateQueries(['profile', targetUserId]);
-                toast.success(isRequested ? "Request withdrawn" : "Unfollowed user");
+                toast.success(isRequested ? "Request withdrawn" : `Unfollowed ${profile.fullname}`);
             } else {
                 const response = await userService.followUser(targetUserId);
-                queryClient.invalidateQueries(['profile', targetUserId]);
                 if (response.status === 'requested') toast.success("Request sent");
-                else toast.success("Followed user");
+                else toast.success(`Followed ${profile.fullname}`);
             }
+            queryClient.invalidateQueries(['profile', targetUserId]); // Re-fetch to ensure consistency
         } catch (error) {
+            queryClient.setQueryData(['profile', targetUserId], previousProfile); // Rollback
             console.error("Follow action failed", error);
-            toast.error("Action failed");
+            toast.error("Failed to update follow status");
         } finally {
             setFollowLoading(false);
         }
     };
 
+    const handleMessage = async () => {
+        try {
+            const conversation = await chatService.initiateConversation(targetUserId);
+            navigate(`/chat/${conversation._id}`);
+        } catch (error) {
+            console.error("Failed to start chat", error);
+            toast.error("Could not start chat");
+        }
+    };
 
 
     // Real-time follow status update
@@ -160,6 +188,7 @@ const Profile = () => {
                                     <ListIcon size={20} />
                                 </button>
                             </div>
+
                         </div>
 
                         <div className="profile-info-container">
@@ -192,18 +221,28 @@ const Profile = () => {
                                             </button>
                                         </>
                                     ) : (
-                                        <button
-                                            className="btn-edit-profile"
-                                            style={{
-                                                background: (isFollowing || isRequested) ? 'transparent' : 'var(--color-primary)',
-                                                border: (isFollowing || isRequested) ? '1px solid var(--color-border)' : 'none',
-                                                color: (isFollowing || isRequested) ? 'var(--color-text-main)' : '#fff'
-                                            }}
-                                            onClick={handleFollowToggle}
-                                            disabled={followLoading}
-                                        >
-                                            <span>{isFollowing ? 'Unfollow' : (isRequested ? 'Requested' : 'Follow')}</span>
-                                        </button>
+                                        <>
+                                            <button
+                                                className="btn-edit-profile"
+                                                style={{
+                                                    background: (isFollowing || isRequested) ? 'transparent' : 'var(--color-primary)',
+                                                    border: (isFollowing || isRequested) ? '1px solid var(--color-border)' : 'none',
+                                                    color: (isFollowing || isRequested) ? 'var(--color-text-main)' : '#fff'
+                                                }}
+                                                onClick={handleFollowToggle}
+                                                disabled={followLoading}
+                                            >
+                                                <span>{isFollowing ? 'Unfollow' : (isRequested ? 'Requested' : 'Follow')}</span>
+                                            </button>
+                                            <button
+                                                className="btn-edit-profile"
+                                                style={{ color: 'var(--color-text-main)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', marginLeft: '8px' }}
+                                                onClick={handleMessage}
+                                            >
+                                                <MessageSquare size={18} />
+                                                <span>Message</span>
+                                            </button>
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -327,7 +366,12 @@ const Profile = () => {
                         isOpen={isEditModalOpen}
                         profile={profile}
                         onClose={() => setIsEditModalOpen(false)}
-                        onUpdate={(updatedData) => setProfile(prev => ({ ...prev, ...updatedData }))}
+                        onUpdate={(updatedData) => {
+                            queryClient.setQueryData(['profile', targetUserId], (old) => ({
+                                ...old,
+                                ...updatedData
+                            }));
+                        }}
                     />
                     <PostDetailModal
                         isOpen={!!selectedPost}

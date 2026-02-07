@@ -476,3 +476,21 @@ exports.getSavedPosts = async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 };
+
+/**
+ * Get users the current user is following
+ * GET /api/users/following
+ */
+exports.getFollowing = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const user = await User.findById(userId).populate('following', 'username fullname avatar isPrivate').lean();
+
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        res.json({ following: user.following || [] });
+    } catch (error) {
+        console.error("Error fetching following:", error);
+        res.status(500).json({ message: "Server Error" });
+    }
+};

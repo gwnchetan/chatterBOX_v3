@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './Navbar.css';
 import Avatar from '../common/Avatar';
 import BrandLogo from '../common/BrandLogo';
-import { Home, Grid, Bookmark, Send, BarChart, Settings, LogOut, User, Plus } from '../common/Icons';
+import { Home, Grid, Bookmark, Send, BarChart, Settings, LogOut, User, Plus, MessageSquare } from '../common/Icons';
 import SettingsModal from '../common/SettingsModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -39,7 +39,7 @@ const Navbar = () => {
         if (path === '/feed') return 'Feed';
         if (path === '/explore') return 'Explore';
         if (path === '/favorites') return 'Favorites';
-        if (path === '/direct') return 'Direct';
+        if (path.startsWith('/chat')) return 'Messages';
         if (path === '/stats') return 'Stats';
         if (path === '/settings') return 'Settings';
         if (path === '/create') return 'Create';
@@ -59,8 +59,8 @@ const Navbar = () => {
         { id: 'Feed', icon: <Home />, label: 'Feed', path: '/feed' },
         { id: 'Create', icon: <Plus />, label: 'Create', path: '/create' },
         { id: 'Explore', icon: <Grid />, label: 'Explore', path: '/explore' },
+        { id: 'Messages', icon: <MessageSquare />, label: 'Messages', path: '/chat' },
         { id: 'Favorites', icon: <Bookmark />, label: 'My Favorites', path: '/favorites' },
-        { id: 'Direct', icon: <Send />, label: 'Direct', path: '/direct' },
         { id: 'Stats', icon: <BarChart />, label: 'Stats', path: '/stats' },
         { id: 'Settings', icon: <Settings />, label: 'Settings', path: '/settings' },
     ];

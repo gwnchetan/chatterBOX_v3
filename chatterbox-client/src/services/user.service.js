@@ -9,6 +9,11 @@ const userService = {
         return response.data;
     },
 
+    getFollowing: async () => {
+        const response = await api.get('/users/following');
+        return response.data;
+    },
+
     /**
      * Fetch all posts by a specific user
      */

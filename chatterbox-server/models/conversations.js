@@ -25,6 +25,15 @@ const conversationSchema = new mongoose.Schema({
     admin: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
+    },
+    status: {
+        type: String,
+        enum: ['active', 'pending', 'rejected'],
+        default: 'active'
+    },
+    requestedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
     }
 }, {
     timestamps: true

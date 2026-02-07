@@ -30,15 +30,19 @@ class SocketService {
     }
 
     disconnect() {
-        if (this.socket) {
-            this.socket.disconnect();
-            this.socket = null;
+        if (this._socket) {
+            this._socket.disconnect();
+            this._socket = null;
         }
     }
 
+    get socket() {
+        return this._socket;
+    }
+
     joinPost(postId) {
-        if (this.socket && postId) {
-            this.socket.emit('join_post', postId);
+        if (this._socket && postId) {
+            this._socket.emit('join_post', postId);
         }
     }
 

@@ -21,4 +21,8 @@ router.get('/conversations/:conversationId/messages', chatController.getMessages
 // Mark as Read
 router.put('/conversations/:conversationId/read', chatController.markAsRead);
 
+// Chat Requests
+router.post('/request/:conversationId/accept', chatController.acceptChatRequest);
+router.post('/request/:conversationId/reject', chatController.rejectChatRequest);
+
 module.exports = router;

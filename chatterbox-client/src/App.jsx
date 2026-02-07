@@ -13,6 +13,7 @@ const Explore = lazy(() => import('./pages/explore'));
 const Favorites = lazy(() => import('./pages/favorites'));
 const WIP = lazy(() => import('./pages/wip'));
 const NotificationsPage = lazy(() => import('./pages/notifications'));
+import Chat from './pages/Chat';
 
 import { socketService } from './services/socket.service';
 
@@ -86,6 +87,16 @@ function App() {
             <Route path="/notifications" element={
               <ProtectedRoute>
                 <NotificationsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/chat" element={
+              <ProtectedRoute>
+                <Chat />
+              </ProtectedRoute>
+            } />
+            <Route path="/chat/:conversationId" element={
+              <ProtectedRoute>
+                <Chat />
               </ProtectedRoute>
             } />
           </Routes>

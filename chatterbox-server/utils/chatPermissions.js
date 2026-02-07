@@ -23,9 +23,9 @@ const canChat = async (userA, userB) => {
         throw new Error(`Chat not allowed: ${blocker} blocked the conversation.`);
     }
 
-    // 2. Check Connection (Must adhere to strict privacy? Or just following?)
-    // Requirement: "Users can join conversation specific rooms."
-    // Usually, DM requires some connection. Let's enforce "Must follow OR be followed".
+    // 2. Check Connection (Relaxed for Message Requests)
+    // We allow chat initiation. Privacy is handled by Conversation Status.
+    /*
     const connection = await Relationship.findOne({
         $or: [
             { requester: userA, recipient: userB, status: 'accepted' },
@@ -36,6 +36,7 @@ const canChat = async (userA, userB) => {
     if (!connection) {
         throw new Error("You must follow each other or be connected to chat.");
     }
+    */
 
     return true;
 };

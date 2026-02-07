@@ -1,7 +1,8 @@
 // Verified: handleFollowToggle correctly sets 'requested' state and shows toast.
 // Button text also updates based on isRequested state.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import userService from '../services/user.service';
 import PostCard from '../components/feed/PostCard';
@@ -25,57 +26,72 @@ const Profile = () => {
     const toast = useToast();
     const { mergePosts } = useFeed();
 
-    const [userId, setUserId] = useState(paramId);
-    const [profile, setProfile] = useState(null);
-    const [posts, setPosts] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [viewMode, setViewMode] = useState('list'); // Default to list
+    const queryClient = useQueryClient();
+
+    // 1. Resolve effective userId
+    const storedUser = JSON.parse(localStorage.getItem('user'));
+    const currentUserId = storedUser ? (storedUser.id || storedUser._id) : null;
+
+    // Determine the ID to fetch (param or current user)
+    const targetUserId = paramId || currentUserId;
+
+    useEffect(() => {
+        if (!targetUserId) {
+            toast.error("Please login to view your profile");
+            navigate('/');
+        }
+    }, [targetUserId, navigate, toast]);
+
+
+    const isOwner = currentUserId && targetUserId && (String(targetUserId) === String(currentUserId));
+
+    // 2. Fetch Profile Data (Caching enabled)
+    const { data: profile, isLoading: profileLoading } = useQuery({
+        queryKey: ['profile', targetUserId],
+        queryFn: () => userService.getProfile(targetUserId).then(res => res.user),
+        enabled: !!targetUserId,
+        staleTime: 1000 * 60 * 5, // 5 minutes fresh
+    });
+
+    // 3. Fetch Posts Data (Caching enabled)
+    const { data: postsData } = useQuery({
+        queryKey: ['posts', targetUserId],
+        queryFn: () => userService.getUserPosts(targetUserId),
+        enabled: !!targetUserId && !!profile && (!profile.isPrivate || isOwner || profile?.followStatus === 'following'),
+        staleTime: 1000 * 60 * 2, // 2 minutes fresh
+    });
+
+    const posts = postsData?.posts || [];
+    const loading = profileLoading;
+
+    // Sync posts to FeedContext (optional)
+    useEffect(() => {
+        if (posts.length > 0) mergePosts(posts);
+    }, [posts, mergePosts]);
+
+    const [viewMode, setViewMode] = useState('list');
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [selectedPost, setSelectedPost] = useState(null);
-    const [isFollowing, setIsFollowing] = useState(false);
-    const [isRequested, setIsRequested] = useState(false);
     const [followLoading, setFollowLoading] = useState(false);
 
-    const currentUser = JSON.parse(localStorage.getItem('user'));
-    const currentUserId = currentUser ? (currentUser.id || currentUser._id) : null;
-    const isOwner = currentUserId && userId && (String(userId) === String(currentUserId));
+    // Derived State for UI
+    const isFollowing = profile?.followStatus === 'following';
+    const isRequested = profile?.followStatus === 'requested';
 
     const handleFollowToggle = async () => {
         if (followLoading) return;
         setFollowLoading(true);
         try {
             if (isFollowing || isRequested) {
-                // Unfollow or Withdraw Request
-                await userService.unfollowUser(userId);
-
-                const wasFollowing = isFollowing;
-                setIsFollowing(false);
-                setIsRequested(false);
-
-                // Only update count if actually following
-                if (wasFollowing) {
-                    setProfile(prev => ({
-                        ...prev,
-                        stats: { ...prev.stats, followers: Math.max(0, prev.stats.followers - 1) }
-                    }));
-                }
+                await userService.unfollowUser(targetUserId);
+                queryClient.invalidateQueries(['profile', targetUserId]);
                 toast.success(isRequested ? "Request withdrawn" : "Unfollowed user");
             } else {
-                // Follow
-                const response = await userService.followUser(userId);
-
-                if (response.status === 'requested') {
-                    setIsRequested(true);
-                    toast.success("Request sent");
-                } else {
-                    setIsFollowing(true);
-                    setProfile(prev => ({
-                        ...prev,
-                        stats: { ...prev.stats, followers: prev.stats.followers + 1 }
-                    }));
-                    toast.success("Followed user");
-                }
+                const response = await userService.followUser(targetUserId);
+                queryClient.invalidateQueries(['profile', targetUserId]);
+                if (response.status === 'requested') toast.success("Request sent");
+                else toast.success("Followed user");
             }
         } catch (error) {
             console.error("Follow action failed", error);
@@ -85,116 +101,22 @@ const Profile = () => {
         }
     };
 
-    // 1. Resolve effective userId
-    useEffect(() => {
-        if (!paramId) {
-            const storedUser = JSON.parse(localStorage.getItem('user'));
-            if (storedUser && (storedUser.id || storedUser._id)) {
-                setUserId(storedUser.id || storedUser._id);
-            } else {
-                toast.error("Please login to view your profile");
-                navigate('/');
-            }
-        } else {
-            setUserId(paramId);
-        }
-    }, [paramId, navigate, toast]);
-
-    // Fetch Profile Data
-    const fetchProfile = useCallback(async (uid) => {
-        if (!uid) return;
-        try {
-            const data = await userService.getProfile(uid);
-            const userProfile = data.user;
-            setProfile(userProfile);
-
-            // Sync Follow Status
-            const status = userProfile.followStatus;
-            const _isFollowing = status === 'following';
-            setIsFollowing(_isFollowing);
-            setIsRequested(status === 'requested');
-
-            // Determine if we should fetch posts
-            const storedUser = JSON.parse(localStorage.getItem('user'));
-            const _isOwner = storedUser && (uid === (storedUser.id || storedUser._id));
-
-            if (!_isOwner && userProfile.isPrivate && !_isFollowing) {
-                setLoading(false);
-            } else {
-                try {
-                    const postData = await userService.getUserPosts(uid);
-                    mergePosts(postData.posts);
-                    setPosts(postData.posts);
-                } catch (e) { console.error(e); }
-                setLoading(false);
-            }
-        } catch (err) {
-            console.error("Profile fetch error:", err);
-            toast.error("Failed to load profile");
-            setLoading(false);
-        }
-    }, [toast, mergePosts]);
-
-    // Fetch User Posts
-    const fetchPosts = useCallback(async (uid) => {
-        if (!uid) return;
-        try {
-            console.log(`[Profile] Fetching posts for user: ${uid}`);
-            const data = await userService.getUserPosts(uid);
-            console.log("[Profile] Posts Data received:", data);
-
-            if (data && Array.isArray(data.posts)) {
-                mergePosts(data.posts);
-                setPosts(data.posts);
-            } else {
-                console.error("[Profile] Invalid posts format received", data);
-                setPosts([]);
-            }
-        } catch (err) {
-            console.error("[Profile] Posts fetch error:", err);
-            setPosts([]);
-        }
-    }, [mergePosts]);
-
-    useEffect(() => {
-        if (userId) {
-            setLoading(true);
-            fetchProfile(userId);
-        }
-    }, [userId, fetchProfile]);
-
 
 
     // Real-time follow status update
+    // Real-time follow status update
     useEffect(() => {
         const handleStatusUpdate = (data) => {
-            // Check if this update is relevant to the profile we are viewing
-            if (data.targetUserId === userId) {
-                console.log("Real-time follow update:", data);
-                if (data.status === 'following') {
-                    setIsFollowing(true);
-                    setIsRequested(false);
-                    setProfile(prev => ({
-                        ...prev,
-                        stats: { ...prev.stats, followers: (prev.stats?.followers || 0) + 1 }
-                    }));
-                } else if (data.status === 'none') {
-                    setIsFollowing(false);
-                    setIsRequested(false);
-                    setProfile(prev => ({
-                        ...prev,
-                        stats: { ...prev.stats, followers: Math.max(0, (prev.stats?.followers || 0) - 1) }
-                    }));
-                }
+            if (data.targetUserId === targetUserId) {
+                queryClient.invalidateQueries(['profile', targetUserId]);
             }
         };
 
         socketService.on('user:follow_status_update', handleStatusUpdate);
-
         return () => {
             socketService.off('user:follow_status_update', handleStatusUpdate);
         };
-    }, [userId]);
+    }, [targetUserId, queryClient]);
 
     // ... (Existing code)
 

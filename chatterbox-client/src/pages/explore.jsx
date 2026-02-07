@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { postsService } from '../services/posts.service';
 import userService from '../services/user.service'; // For search
 import Navbar from '../components/layout/Navbar';
@@ -13,57 +14,65 @@ import { useFeed } from '../context/FeedContext';
 import './explore.css';
 
 const Explore = () => {
-    const [posts, setPosts] = useState([]); // Explore feed OR Search results
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchResultsUsers, setSearchResultsUsers] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [searching, setSearching] = useState(false);
+    const [debouncedQuery, setDebouncedQuery] = useState('');
     const navigate = useNavigate();
-    const { mergePosts } = useFeed();
+    const { mergePosts, posts: allPosts } = useFeed();
+    const queryClient = useQueryClient();
 
+    // Debounce Search Input
     useEffect(() => {
-        loadExploreFeed();
-    }, []);
+        const timer = setTimeout(() => {
+            setDebouncedQuery(searchQuery);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
-    const loadExploreFeed = async () => {
-        try {
-            setLoading(true);
-            const data = await postsService.getExplorePosts();
-            mergePosts(data.posts || []);
-            setPosts(data.posts || []);
-        } catch (error) {
-            console.error('Error loading explore feed:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    // 1. Explore Feed Query
+    const {
+        data: exploreData,
+        isLoading: exploreLoading
+    } = useQuery({
+        queryKey: ['explore'],
+        queryFn: postsService.getExplorePosts,
+        enabled: !debouncedQuery,
+        staleTime: 1000 * 60 * 5,
+    });
 
-    const handleSearch = async (e) => {
-        const query = e.target.value;
-        setSearchQuery(query);
+    // 2. Search Query
+    const {
+        data: searchData,
+        isLoading: searchLoading
+    } = useQuery({
+        queryKey: ['search', debouncedQuery],
+        queryFn: async () => {
+            const [userData, postData] = await Promise.all([
+                userService.searchUsers(debouncedQuery),
+                postsService.searchPosts(debouncedQuery)
+            ]);
+            return { users: userData.users || [], posts: postData.posts || [] };
+        },
+        enabled: !!debouncedQuery,
+    });
 
-        if (query.trim().length > 0) {
-            setSearching(true);
-            try {
-                // Parallel search: Users + Posts
-                const [userData, postData] = await Promise.all([
-                    userService.searchUsers(query),
-                    postsService.searchPosts(query)
-                ]);
+    // Sync posts/data to UI
+    const isSearching = !!debouncedQuery;
+    const loading = isSearching ? searchLoading : exploreLoading;
+    const searchResultsUsers = isSearching ? (searchData?.users || []) : [];
 
-                setSearchResultsUsers(userData.users || []);
-                mergePosts(postData.posts || []);
-                setPosts(postData.posts || []); // Update main grid with search results
-            } catch (error) {
-                console.error("Search error:", error);
-            } finally {
-                setSearching(false);
-            }
-        } else {
-            // Reset to explore feed
-            setSearchResultsUsers([]);
-            loadExploreFeed();
-        }
+    // Merge posts to context + Resolve visible posts
+    const visiblePosts = useMemo(() => {
+        const rawPosts = isSearching ? (searchData?.posts || []) : (exploreData?.posts || []);
+        // Sync to context
+        if (rawPosts.length > 0) mergePosts(rawPosts);
+
+        // Return context version if available (for likes/reposts)
+        return rawPosts.map(p => allPosts[p._id] || p);
+    }, [isSearching, searchData, exploreData, allPosts, mergePosts]);
+
+
+    const handleSearch = (e) => {
+        setSearchQuery(e.target.value);
     };
 
     const handleUserClick = (userId) => {
@@ -112,11 +121,11 @@ const Explore = () => {
                     <div className="explore-grid">
                         {searchQuery && <h3 className="section-title">Posts</h3>}
 
-                        {loading || searching ? (
+                        {loading ? (
                             <div className="explore-loading">Loading...</div>
-                        ) : posts.length > 0 ? (
+                        ) : visiblePosts.length > 0 ? (
                             <div className="masonry-grid">
-                                {posts.map(post => (
+                                {visiblePosts.map(post => (
                                     <div key={post._id} className="masonry-item">
                                         <PostCard post={post} />
                                     </div>
@@ -124,7 +133,7 @@ const Explore = () => {
                             </div>
                         ) : (
                             <div className="no-results">
-                                {searchQuery ? "No posts found matching your search." : "No explore posts available."}
+                                {debouncedQuery ? "No posts found matching your search." : "No explore posts available."}
                             </div>
                         )}
                     </div>

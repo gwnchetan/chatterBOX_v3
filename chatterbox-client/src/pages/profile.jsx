@@ -1,6 +1,7 @@
 // Verified: handleFollowToggle correctly sets 'requested' state and shows toast.
 // Button text also updates based on isRequested state.
 
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import userService from '../services/user.service';
 import PostCard from '../components/feed/PostCard';

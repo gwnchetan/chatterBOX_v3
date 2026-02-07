@@ -17,9 +17,12 @@ router.post('/unsave/:postId', authMiddleware, userController.unsavePost);
 // Update profile
 router.patch('/profile', authMiddleware, userController.updateProfile);
 
+const optionalAuthMiddleware = require('../middleware/optionalAuth.middleware');
+
 // User Profile & Posts
-router.get('/:userId', userController.getUserProfile);
-router.get('/:userId/posts', userController.getUserPosts);
+// Use optionalAuth so we can see public info AND check private access for followers/owners
+router.get('/:userId', optionalAuthMiddleware, userController.getUserProfile);
+router.get('/:userId/posts', optionalAuthMiddleware, userController.getUserPosts);
 
 // Follow/Unfollow
 router.post('/:userId/follow', authMiddleware, userController.followUser);

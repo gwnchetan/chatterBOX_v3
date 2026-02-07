@@ -191,10 +191,7 @@
     text-align: center;
     gap: var(--spacing-md);
     max-width: 400px;
-    animation: none;
-    /* fadeIn 0.5s ease-out; */
-    border: 2px solid red;
-    /* DEBUG */
+    animation: fadeIn 0.5s ease-out;
 }
 
 @keyframes fadeIn {

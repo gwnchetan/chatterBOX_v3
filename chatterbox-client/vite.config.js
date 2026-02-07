@@ -18,8 +18,8 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['framer-motion', 'lucide-react'], // Assuming lucide is used for icons based on previous context
-          utils: ['axios', 'date-fns'] // Common utils if used
+          ffmpeg: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
+          utils: ['axios', 'socket.io-client']
         },
       },
     },

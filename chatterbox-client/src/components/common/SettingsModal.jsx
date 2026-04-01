@@ -1,30 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { X, Moon, Sun, Lock } from './Icons';
 import userService from '../../services/user.service';
+import Avatar from './Avatar';
 
 const SettingsModal = ({ isOpen, onClose }) => {
     const { theme, setMode } = useTheme();
     const [isPrivate, setIsPrivate] = useState(false);
+    const [blockedUsers, setBlockedUsers] = useState([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (isOpen) {
-            const fetchSettings = async () => {
-                try {
-                    const userStr = localStorage.getItem('user');
-                    if (userStr) {
-                        const user = JSON.parse(userStr);
-                        // Fetch fresh profile data
-                        const data = await userService.getProfile(user._id || user.id);
-                        setIsPrivate(data.user.isPrivate || false);
-                    }
-                } catch (error) {
-                    console.error("Failed to load settings", error);
-                }
-            };
-            fetchSettings();
-        }
+        if (!isOpen) return;
+
+        const fetchSettings = async () => {
+            try {
+                const user = JSON.parse(localStorage.getItem('user') || 'null');
+                if (!user) return;
+
+                const [profileData, blockedData] = await Promise.all([
+                    userService.getProfile(user._id || user.id),
+                    userService.getBlockedUsers()
+                ]);
+
+                setIsPrivate(profileData.user.isPrivate || false);
+                setBlockedUsers(blockedData.blockedUsers || []);
+            } catch (error) {
+                console.error('Failed to load settings', error);
+            }
+        };
+
+        fetchSettings();
     }, [isOpen]);
 
     const togglePrivacy = async () => {
@@ -34,9 +40,18 @@ const SettingsModal = ({ isOpen, onClose }) => {
             await userService.updateProfile({ isPrivate: newState });
             setIsPrivate(newState);
         } catch (error) {
-            console.error("Failed to update privacy", error);
+            console.error('Failed to update privacy', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleUnblock = async (userId) => {
+        try {
+            await userService.unblockUser(userId);
+            setBlockedUsers((currentUsers) => currentUsers.filter((user) => user._id !== userId));
+        } catch (error) {
+            console.error('Failed to unblock user', error);
         }
     };
 
@@ -44,7 +59,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content settings-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-content settings-modal" onClick={(event) => event.stopPropagation()}>
                 <div className="modal-header">
                     <h3>Settings</h3>
                     <button className="close-btn" onClick={onClose}>
@@ -96,10 +111,34 @@ const SettingsModal = ({ isOpen, onClose }) => {
                             </label>
                         </div>
                     </div>
+
+                    <div className="setting-section" style={{ marginTop: '24px' }}>
+                        <h4>Blocked Accounts</h4>
+                        <div className="blocked-list">
+                            {blockedUsers.length === 0 ? (
+                                <div className="blocked-empty">No blocked accounts.</div>
+                            ) : (
+                                blockedUsers.map((user) => (
+                                    <div key={user._id} className="blocked-item">
+                                        <div className="blocked-user">
+                                            <Avatar src={user.avatar} size="sm" alt={user.fullname} />
+                                            <div className="blocked-text">
+                                                <span className="blocked-name">{user.fullname}</span>
+                                                <span className="blocked-handle">@{user.username}</span>
+                                            </div>
+                                        </div>
+                                        <button className="unblock-btn" onClick={() => handleUnblock(user._id)}>
+                                            Unblock
+                                        </button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <style jsx>{`
+            <style>{`
                 .modal-overlay {
                     position: fixed;
                     top: 0;
@@ -115,7 +154,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 }
                 .settings-modal {
                     background: var(--color-surface);
-                    width: 400px;
+                    width: 420px;
                     max-width: 90%;
                     border-radius: 20px;
                     border: 1px solid var(--color-border);
@@ -149,6 +188,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 }
                 .modal-body {
                     padding: 20px;
+                    max-height: 70vh;
+                    overflow: auto;
                 }
                 .setting-section h4 {
                     margin: 0 0 12px 0;
@@ -211,9 +252,54 @@ const SettingsModal = ({ isOpen, onClose }) => {
                 .privacy-desc {
                     font-size: 0.8rem;
                     color: var(--color-text-muted);
-                    max-width: 200px;
+                    max-width: 220px;
                 }
-                /* Toggle Switch */
+                .blocked-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                }
+                .blocked-empty {
+                    padding: 14px;
+                    background: var(--color-bg);
+                    color: var(--color-text-muted);
+                    border-radius: 12px;
+                    text-align: center;
+                }
+                .blocked-item {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 12px;
+                    padding: 12px;
+                    background: var(--color-bg);
+                    border-radius: 12px;
+                }
+                .blocked-user {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }
+                .blocked-text {
+                    display: flex;
+                    flex-direction: column;
+                }
+                .blocked-name {
+                    color: var(--color-text-main);
+                    font-weight: 600;
+                }
+                .blocked-handle {
+                    color: var(--color-text-muted);
+                    font-size: 0.85rem;
+                }
+                .unblock-btn {
+                    background: transparent;
+                    color: var(--color-text-main);
+                    border: 1px solid var(--color-border);
+                    border-radius: 999px;
+                    padding: 8px 14px;
+                    cursor: pointer;
+                }
                 .toggle-switch {
                     position: relative;
                     display: inline-block;
@@ -221,7 +307,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                     height: 28px;
                     flex-shrink: 0;
                 }
-                .toggle-switch input { 
+                .toggle-switch input {
                     opacity: 0;
                     width: 0;
                     height: 0;
@@ -243,7 +329,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                     width: 20px;
                     left: 4px;
                     bottom: 4px;
-                    background-color: white; /* Thumb color */
+                    background-color: white;
                     transition: .4s;
                 }
                 input:checked + .slider {

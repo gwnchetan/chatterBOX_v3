@@ -25,6 +25,6 @@ const userSchema = new mongoose.Schema({
 
 // Indexes
 userSchema.index({ username: 'text', fullname: 'text' }); // Text search
-userSchema.index({ username: 1 }); // Exact match lookup
+userSchema.index({ blockedUsers: 1 });
 
 module.exports = mongoose.model("User", userSchema);

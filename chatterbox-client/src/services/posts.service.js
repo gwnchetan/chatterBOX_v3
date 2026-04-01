@@ -22,9 +22,9 @@ export const postsService = {
         return response.data;
     },
 
-    getFeed: async (cursor = null, limit = 10) => {
+    getFeed: async ({ cursor = null, limit = 10, section = 'friends' } = {}) => {
         verifyAuth();
-        let url = `/posts?limit=${limit}`;
+        let url = `/posts?limit=${limit}&section=${section}`;
         if (cursor) {
             url += `&cursor=${cursor}`;
         }
@@ -74,9 +74,21 @@ export const postsService = {
         return response.data;
     },
 
+    addReply: async (postId, commentId, content) => {
+        verifyAuth();
+        const response = await api.post(`/posts/${postId}/comments/${commentId}/reply`, { content });
+        return response.data;
+    },
+
     getComments: async (postId) => {
         verifyAuth();
         const response = await api.get(`/posts/${postId}/comments`);
+        return response.data;
+    },
+
+    toggleCommentLike: async (postId, commentId) => {
+        verifyAuth();
+        const response = await api.post(`/posts/${postId}/comments/${commentId}/like`);
         return response.data;
     },
 

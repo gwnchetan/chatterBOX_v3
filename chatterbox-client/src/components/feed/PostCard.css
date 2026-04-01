@@ -652,3 +652,33 @@
     cursor: default;
     opacity: 0.5;
 }
+.comment-inline-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 6px;
+}
+
+.comment-inline-btn {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0;
+}
+
+.comment-item--reply {
+    margin-top: 10px;
+}
+
+.comment-replies {
+    margin-top: 10px;
+    padding-left: 12px;
+    border-left: 1px solid var(--color-border);
+}
+
+.reply-form-inline {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}

@@ -1,4 +1,6 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import Avatar from './common/Avatar';
 import './Toast.css';
 
 const ToastContext = createContext();
@@ -46,23 +48,25 @@ export const ToastProvider = ({ children }) => {
 
 const ToastItem = ({ id, type, message, duration, onRemove }) => {
     const [isExiting, setIsExiting] = useState(false);
+    const isRichMessage = message && typeof message === 'object';
+    const toastTitle = isRichMessage ? message.title : '';
+    const toastBody = isRichMessage ? message.message : message;
+    const toastAvatar = isRichMessage ? message.avatar : '';
 
-    useEffect(() => {
-        if (duration > 0) {
-            const timer = setTimeout(() => {
-                handleClose();
-            }, duration);
-            return () => clearTimeout(timer);
-        }
-    }, [duration]);
-
-    const handleClose = () => {
+    const handleClose = useCallback(() => {
         setIsExiting(true);
-        // Wait for CSS animation (300ms)
         setTimeout(() => {
             onRemove(id);
         }, 300);
-    };
+    }, [id, onRemove]);
+
+    useEffect(() => {
+        if (duration > 0) {
+            const timer = setTimeout(handleClose, duration);
+            return () => clearTimeout(timer);
+        }
+        return undefined;
+    }, [duration, handleClose]);
 
     const getIcon = () => {
         switch (type) {
@@ -103,11 +107,16 @@ const ToastItem = ({ id, type, message, duration, onRemove }) => {
 
     return (
         <div className={`toast toast-${type} ${isExiting ? 'exit' : ''}`} role="alert">
-            <div className="toast-icon">
-                {getIcon()}
+            <div className={`toast-icon ${toastAvatar ? 'toast-icon--avatar' : ''}`}>
+                {toastAvatar ? (
+                    <Avatar src={toastAvatar} alt={toastTitle || toastBody || 'User'} size="sm" />
+                ) : (
+                    getIcon()
+                )}
             </div>
-            <div className="toast-content">
-                {message}
+            <div className={`toast-content ${toastTitle ? 'toast-content--rich' : ''}`}>
+                {toastTitle && <div className="toast-title">{toastTitle}</div>}
+                <div className="toast-message">{toastBody}</div>
             </div>
             <button className="toast-close" onClick={handleClose} aria-label="Close">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

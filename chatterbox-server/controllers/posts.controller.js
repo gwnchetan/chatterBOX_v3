@@ -2,25 +2,28 @@ const Post = require('../models/posts');
 const User = require('../models/users');
 const Like = require('../models/likes');
 const Comment = require('../models/comments');
+const CommentLike = require('../models/commentLikes');
 const Notification = require('../models/notifications');
 const { deleteMedia, generateSignature } = require('../utils/cloudinary');
 const { getIo } = require('../socket');
+const { getViewerContext, normalizeId } = require('../utils/privacy');
 
-// Simple in-memory rate limiter per instance (Temporary)
-// TODO: Replace with Redis-based rate limiter in production environment
-// to handle multiple instances and server restarts.
-const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000;
 const MAX_POSTS_PER_WINDOW = 5;
 const postRateLimits = new Map();
-const blockCache = new Map(); // Key: userId, Value: { blockedBy: [], timestamp: number }
-const BLOCK_CACHE_TTL = 60 * 1000; // 60 seconds
+
+const POST_AUTHOR_FIELDS = 'username fullname avatar isPrivate';
+const COMMENT_USER_FIELDS = 'username fullname avatar';
+const POPULAR_WEIGHTS = {
+    like: 1,
+    comment: 2,
+    repost: 3
+};
 
 const checkRateLimit = (userId) => {
     const now = Date.now();
     const userLimits = postRateLimits.get(userId) || [];
-
-    // Filter out old timestamps
-    const validTimestamps = userLimits.filter(timestamp => now - timestamp < RATE_LIMIT_WINDOW);
+    const validTimestamps = userLimits.filter((timestamp) => now - timestamp < RATE_LIMIT_WINDOW);
 
     if (validTimestamps.length >= MAX_POSTS_PER_WINDOW) {
         return false;
@@ -31,17 +34,284 @@ const checkRateLimit = (userId) => {
     return true;
 };
 
+const encodeCursor = (section, post) => {
+    if (!post) return null;
+
+    if (section === 'popular') {
+        return `${post.engagementScore || 0}_${post.createdAt.toISOString()}_${post._id}`;
+    }
+
+    return `${post.createdAt.toISOString()}_${post._id}`;
+};
+
+const applyCursor = (query, section, cursor) => {
+    if (!cursor) return query;
+
+    if (section === 'popular') {
+        const [score, date, id] = cursor.split('_');
+        query.$or = [
+            { engagementScore: { $lt: Number(score) } },
+            {
+                engagementScore: Number(score),
+                createdAt: { $lt: new Date(date) }
+            },
+            {
+                engagementScore: Number(score),
+                createdAt: new Date(date),
+                _id: { $lt: id }
+            }
+        ];
+
+        return query;
+    }
+
+    const [date, id] = cursor.split('_');
+    query.$or = [
+        { createdAt: { $lt: new Date(date) } },
+        {
+            createdAt: new Date(date),
+            _id: { $lt: id }
+        }
+    ];
+
+    return query;
+};
+
+const getFeedConfig = (section, viewerContext) => {
+    const hiddenUserIds = Array.from(viewerContext.hiddenUserIds);
+
+    if (section === 'friends') {
+        const friendIds = [viewerContext.viewerId, ...Array.from(viewerContext.followingIds)]
+            .filter((userId) => !viewerContext.hiddenUserIds.has(userId));
+
+        return {
+            section,
+            query: {
+                isDeleted: false,
+                author: { $in: friendIds }
+            },
+            sort: { createdAt: -1, _id: -1 }
+        };
+    }
+
+    if (section === 'popular') {
+        return {
+            section,
+            query: {
+                isDeleted: false,
+                visibility: 'public',
+                author: { $nin: hiddenUserIds }
+            },
+            sort: { engagementScore: -1, createdAt: -1, _id: -1 }
+        };
+    }
+
+    return {
+        section: 'recents',
+        query: {
+            isDeleted: false,
+            author: { $nin: hiddenUserIds }
+        },
+        sort: { createdAt: -1, _id: -1 }
+    };
+};
+
+const populatePostsQuery = (query, sort, limit) => Post.find(query)
+    .sort(sort)
+    .limit(limit)
+    .populate('author', POST_AUTHOR_FIELDS)
+    .populate({
+        path: 'repostOf',
+        populate: { path: 'author', select: POST_AUTHOR_FIELDS }
+    })
+    .lean();
+
+const annotatePosts = async (posts, viewerContext) => {
+    if (posts.length === 0) {
+        return posts;
+    }
+
+    const postIds = posts.map((post) => post._id);
+    const [userLikes, userReposts] = await Promise.all([
+        Like.find({ post: { $in: postIds }, user: viewerContext.viewerId }).select('post').lean(),
+        Post.find({ repostOf: { $in: postIds }, author: viewerContext.viewerId }).select('repostOf').lean()
+    ]);
+
+    const likedPostIds = new Set(userLikes.map((like) => normalizeId(like.post)));
+    const repostedPostIds = new Set(userReposts.map((repost) => normalizeId(repost.repostOf)));
+
+    return posts.map((post) => ({
+        ...post,
+        liked: likedPostIds.has(normalizeId(post._id)),
+        reposted: repostedPostIds.has(normalizeId(post._id)),
+        saved: viewerContext.savedPostIds.has(normalizeId(post._id)),
+        isRepost: !!post.repostOf,
+        originalPost: post.repostOf || null
+    }));
+};
+
+const getVisibleFeedPosts = async ({ section, cursor, limitNum, viewerContext }) => {
+    const { query, sort } = getFeedConfig(section, viewerContext);
+    const fetchLimit = Math.max(limitNum * 5, limitNum + 10);
+    const posts = await populatePostsQuery(applyCursor({ ...query }, section, cursor), sort, fetchLimit);
+    const visiblePosts = posts.filter((post) => viewerContext.canSeePost(post)).slice(0, limitNum);
+    const hydratedPosts = await annotatePosts(visiblePosts, viewerContext);
+
+    const nextCursor = hydratedPosts.length === limitNum
+        ? encodeCursor(section, hydratedPosts[hydratedPosts.length - 1])
+        : null;
+
+    return { posts: hydratedPosts, nextCursor };
+};
+
+const buildPostMetricsUpdate = ({ likeDelta = 0, commentDelta = 0, repostDelta = 0 }) => {
+    const engagementDelta =
+        (likeDelta * POPULAR_WEIGHTS.like)
+        + (commentDelta * POPULAR_WEIGHTS.comment)
+        + (repostDelta * POPULAR_WEIGHTS.repost);
+
+    return {
+        $inc: {
+            ...(likeDelta ? { likeCount: likeDelta } : {}),
+            ...(commentDelta ? { commentCount: commentDelta } : {}),
+            ...(repostDelta ? { repostCount: repostDelta } : {}),
+            ...(engagementDelta ? { engagementScore: engagementDelta } : {})
+        },
+        $set: {
+            lastInteractionAt: new Date()
+        }
+    };
+};
+
+const emitPostCommentUpdate = (postId, commentCount) => {
+    try {
+        getIo().to(`post:${postId}`).emit('post:comment:update', {
+            postId,
+            commentCount
+        });
+    } catch (error) {
+        console.error('Socket emit failed', error);
+    }
+};
+
+const emitPostLikeUpdate = (postId, likeCount) => {
+    try {
+        getIo().to(`post:${postId}`).emit('post:like:update', {
+            postId,
+            likesCount: likeCount
+        });
+    } catch (error) {
+        console.error('Socket emit failed', error);
+    }
+};
+
+const createAndEmitNotification = async ({ recipient, sender, type, post, comment, conversation, text }) => {
+    if (normalizeId(recipient) === normalizeId(sender)) {
+        return null;
+    }
+
+    const notification = new Notification({
+        recipient,
+        sender,
+        type,
+        post,
+        comment,
+        conversation,
+        text
+    });
+
+    await notification.save();
+    await notification.populate('sender', COMMENT_USER_FIELDS);
+    await notification.populate('post', 'content media');
+
+    if (conversation) {
+        await notification.populate('conversation', 'participants status lastMessage');
+    }
+
+    getIo().to(`user:${normalizeId(recipient)}`).emit('notification:new', notification);
+    return notification;
+};
+
+const getPostForViewer = async (postId, viewerContext) => {
+    const post = await Post.findById(postId)
+        .populate('author', POST_AUTHOR_FIELDS)
+        .populate({
+            path: 'repostOf',
+            populate: { path: 'author', select: POST_AUTHOR_FIELDS }
+        })
+        .lean();
+
+    if (!post || !viewerContext.canSeePost(post)) {
+        return null;
+    }
+
+    return post;
+};
+
+const buildCommentsPayload = async (postId, viewerId) => {
+    const topLevelComments = await Comment.find({
+        post: postId,
+        parentComment: null
+    })
+        .sort({ createdAt: 1 })
+        .populate('user', COMMENT_USER_FIELDS)
+        .lean();
+
+    const topLevelIds = topLevelComments.map((comment) => comment._id);
+    const replies = topLevelIds.length > 0
+        ? await Comment.find({
+            post: postId,
+            parentComment: { $in: topLevelIds }
+        })
+            .sort({ createdAt: 1 })
+            .populate('user', COMMENT_USER_FIELDS)
+            .lean()
+        : [];
+
+    const allCommentIds = [
+        ...topLevelComments.map((comment) => comment._id),
+        ...replies.map((comment) => comment._id)
+    ];
+
+    const userLikes = allCommentIds.length > 0
+        ? await CommentLike.find({
+            comment: { $in: allCommentIds },
+            user: viewerId
+        }).select('comment').lean()
+        : [];
+
+    const likedCommentIds = new Set(userLikes.map((like) => normalizeId(like.comment)));
+
+    const repliesByParent = replies.reduce((accumulator, reply) => {
+        const parentId = normalizeId(reply.parentComment);
+        if (!accumulator[parentId]) {
+            accumulator[parentId] = [];
+        }
+
+        accumulator[parentId].push({
+            ...reply,
+            liked: likedCommentIds.has(normalizeId(reply._id))
+        });
+
+        return accumulator;
+    }, {});
+
+    return topLevelComments.map((comment) => ({
+        ...comment,
+        liked: likedCommentIds.has(normalizeId(comment._id)),
+        replies: repliesByParent[normalizeId(comment._id)] || []
+    }));
+};
+
 exports.createPost = async (req, res) => {
     try {
         const { content, media, visibility } = req.body;
-        const userId = req.user._id; // Assuming auth middleware populates req.user
+        const userId = req.user._id;
 
-        // 1. Rate Limiting
         if (!checkRateLimit(userId.toString())) {
             return res.status(429).json({ message: 'Post rate limit exceeded. Please try again later.' });
         }
 
-        // 2. Strict Validation
         if (!content && (!media || media.length === 0)) {
             return res.status(400).json({ message: 'Post must contain content or media.' });
         }
@@ -56,12 +326,12 @@ exports.createPost = async (req, res) => {
                     return res.status(400).json({ message: 'Invalid media format. Missing url, publicId, or type.' });
                 }
 
-                // Validate URL domain (Strict check)
-                // Must be https, cloudinary.com, and belong to our cloud name
                 const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-                if (!item.url.startsWith('https://') ||
-                    !item.url.includes('cloudinary.com') ||
-                    (cloudName && !item.url.includes(cloudName))) {
+                if (
+                    !item.url.startsWith('https://')
+                    || !item.url.includes('cloudinary.com')
+                    || (cloudName && !item.url.includes(cloudName))
+                ) {
                     return res.status(400).json({ message: 'Invalid media source. Must be a secure Cloudinary URL from the authorized cloud.' });
                 }
             }
@@ -70,7 +340,6 @@ exports.createPost = async (req, res) => {
         const validVisibilities = ['public', 'followers', 'private'];
         const postVisibility = validVisibilities.includes(visibility) ? visibility : 'public';
 
-        // 3. Create Document
         const newPost = new Post({
             author: userId,
             content,
@@ -80,13 +349,13 @@ exports.createPost = async (req, res) => {
             createdAt: new Date(),
             likeCount: 0,
             commentCount: 0,
+            repostCount: 0,
             engagementScore: 0
         });
 
         await newPost.save();
 
         res.status(201).json(newPost);
-
     } catch (error) {
         console.error('Error creating post:', error);
         res.status(500).json({ message: 'Internal server error while creating post.' });
@@ -99,30 +368,22 @@ exports.deletePost = async (req, res) => {
         const userId = req.user._id;
 
         const post = await Post.findOne({ _id: id, author: userId });
-
         if (!post) {
             return res.status(404).json({ message: 'Post not found or unauthorized.' });
         }
 
-        // Soft Delete
         post.isDeleted = true;
         await post.save();
 
-        // Async Cleanup (Fire-and-forget)
         if (post.media && post.media.length > 0) {
-            post.media.forEach(item => {
-                if (item.publicId) {
-                    // Map our schema types to Cloudinary resource types
-                    // 'video' -> 'video'
-                    // 'image', 'gif' -> 'image'
-                    const resourceType = item.type === 'video' ? 'video' : 'image';
-                    deleteMedia(item.publicId, resourceType);
-                }
+            post.media.forEach((item) => {
+                if (!item.publicId) return;
+                const resourceType = item.type === 'video' ? 'video' : 'image';
+                deleteMedia(item.publicId, resourceType);
             });
         }
 
         res.json({ message: 'Post deleted successfully.' });
-
     } catch (error) {
         console.error('Error deleting post:', error);
         res.status(500).json({ message: 'Internal server error during post deletion.' });
@@ -131,168 +392,29 @@ exports.deletePost = async (req, res) => {
 
 exports.getFeed = async (req, res) => {
     try {
-        const userId = req.user._id;
-        const { cursor, limit = 20 } = req.query;
-        const limitNum = parseInt(limit);
+        const viewerContext = await getViewerContext(req.user._id);
+        const { cursor, limit = 20, section = 'friends' } = req.query;
+        const limitNum = parseInt(limit, 10);
+        const selectedSection = ['friends', 'recents', 'popular'].includes(section) ? section : 'friends';
 
-        // 1. Block Logic & User Data
-        // Fetch users blocked by current user AND saved posts
-        const currentUser = await User.findById(userId).populate('blockedUsers');
-        const blockedByMe = currentUser.blockedUsers.map(u => u._id.toString());
-        const savedPostIds = new Set(currentUser.savedPosts ? currentUser.savedPosts.map(s => s.toString()) : []);
-
-        // Fetch users who blocked current user
-        // Optimization: In-memory cache with fallback
-        let blockedMe = [];
-        const cachedBlock = blockCache.get(userId.toString());
-        const now = Date.now();
-
-        if (cachedBlock && (now - cachedBlock.timestamp < BLOCK_CACHE_TTL)) {
-            blockedMe = cachedBlock.blockedBy;
-        } else {
-            try {
-                const blockedMeUsers = await User.find({ blockedUsers: userId }).select('_id');
-                blockedMe = blockedMeUsers.map(u => u._id.toString());
-                blockCache.set(userId.toString(), { blockedBy: blockedMe, timestamp: now });
-            } catch (err) {
-                console.error('Error fetching blocked-me users, passing empty list to avoid feed break:', err);
-                blockedMe = [];
-            }
-        }
-
-        const blockedSet = new Set([...blockedByMe, ...blockedMe]);
-
-        // Privacy Filtering: Hide posts from private users I don't follow
-        const followingIds = currentUser.following.map(id => id.toString());
-        const excludeFromPrivacyCheck = [...followingIds, userId.toString()];
-
-        const privateUsersToHide = await User.find({
-            isPrivate: true,
-            _id: { $nin: excludeFromPrivacyCheck }
-        }).select('_id');
-
-        privateUsersToHide.forEach(u => blockedSet.add(u._id.toString()));
-
-        // 2. Query Setup
-        const query = {
-            isDeleted: false,
-            author: { $nin: Array.from(blockedSet) }
-        };
-
-        if (cursor) {
-            const [date, id] = cursor.split('_');
-            query.$or = [
-                { createdAt: { $lt: new Date(date) } },
-                {
-                    createdAt: new Date(date),
-                    _id: { $lt: id }
-                }
-            ];
-        }
-
-        // 3. Application-Level Filter Loop
-        const fetchLimit = limitNum + Math.ceil(limitNum * 0.5);
-
-        const posts = await Post.find(query)
-            .sort({ createdAt: -1, _id: -1 })
-            .limit(fetchLimit)
-            .populate('author', 'username fullname avatar isPrivate')
-            .populate({
-                path: 'repostOf',
-                populate: { path: 'author', select: 'username fullname avatar isPrivate' }
-            })
-            .lean();
-
-        const validPosts = [];
-        const followingStr = currentUser.following.map(id => id.toString());
-
-        for (const post of posts) {
-            // 1. Check Direct Author Privacy
-            if (post.author.isPrivate) {
-                const isMyPost = post.author._id.toString() === userId.toString();
-                const amIFollowing = followingStr.includes(post.author._id.toString());
-                if (!isMyPost && !amIFollowing) continue;
-            }
-
-            // 2. Check Repost Original Author Privacy
-            if (post.repostOf && post.repostOf.author) {
-                const originAuthor = post.repostOf.author;
-                if (originAuthor.isPrivate) {
-                    const isMyOrigin = originAuthor._id.toString() === userId.toString();
-                    const amIFollowingOrigin = followingStr.includes(originAuthor._id.toString());
-                    if (!isMyOrigin && !amIFollowingOrigin) continue;
-                }
-            }
-
-            // Visibility Logic
-            if (post.visibility === 'public') {
-                validPosts.push(post);
-            } else if (post.visibility === 'followers') {
-                if (followingStr.includes(post.author._id.toString()) || post.author._id.toString() === userId.toString()) {
-                    validPosts.push(post);
-                }
-            } else if (post.visibility === 'private') {
-                if (post.author._id.toString() === userId.toString()) {
-                    validPosts.push(post);
-                }
-            }
-
-            if (validPosts.length >= limitNum) break;
-        }
-
-        // 4. Cursor Generation
-        let nextCursor = null;
-        if (validPosts.length > 0) {
-            const lastPost = validPosts[validPosts.length - 1];
-            nextCursor = `${lastPost.createdAt.toISOString()}_${lastPost._id}`;
-        }
-
-        // 5. Hydrate with User Status
-        const postIds = validPosts.map(p => p._id);
-
-        const [userLikes, userReposts] = await Promise.all([
-            Like.find({ post: { $in: postIds }, user: userId }).select('post').lean(),
-            Post.find({ repostOf: { $in: postIds }, author: userId }).select('repostOf').lean()
-        ]);
-
-        const likedPostIds = new Set(userLikes.map(l => l.post.toString()));
-        const repostedPostIds = new Set(userReposts.map(r => r.repostOf.toString()));
-
-        const hydratedPosts = validPosts.map(post => {
-            const p = post;
-            return {
-                ...p,
-                liked: likedPostIds.has(p._id.toString()),
-                reposted: repostedPostIds.has(p._id.toString()),
-                saved: savedPostIds.has(p._id.toString()),
-                isRepost: !!p.repostOf,
-                originalPost: p.repostOf || null
-            };
+        const data = await getVisibleFeedPosts({
+            section: selectedSection,
+            cursor,
+            limitNum,
+            viewerContext
         });
 
-        res.json({
-            posts: hydratedPosts,
-            nextCursor: posts.length > validPosts.length ? nextCursor : (posts.length < fetchLimit ? null : nextCursor)
-        });
-
+        res.json(data);
     } catch (error) {
         console.error('Error fetching feed:', error);
         res.status(500).json({ message: 'Internal server error while fetching feed.' });
     }
 };
+
 exports.getUploadSignature = (req, res) => {
     try {
         const timestamp = Math.round((new Date()).getTime() / 1000);
-        const paramsToSign = {
-            timestamp: timestamp,
-            // folder: 'chatterbox_posts' // Optional: Organize in folders
-        };
-
-        const signature = generateSignature(paramsToSign);
-
-        // Debug Log
-        console.log("Generating Signature. Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME ? "Found" : "Missing");
-        console.log("API Key:", process.env.CLOUDINARY_API_KEY ? "Found" : "Missing");
+        const signature = generateSignature({ timestamp });
 
         res.json({
             signature,
@@ -306,191 +428,245 @@ exports.getUploadSignature = (req, res) => {
     }
 };
 
-/**
- * Get Explore Feed (Random/Popular posts)
- * GET /api/posts/explore
- */
 exports.getExploreFeed = async (req, res) => {
     try {
-        const userId = req.user._id;
+        const viewerContext = await getViewerContext(req.user._id);
         const { limit = 20 } = req.query;
+        const rawPosts = await populatePostsQuery({
+            isDeleted: false,
+            visibility: 'public',
+            author: { $nin: Array.from(viewerContext.hiddenUserIds) }
+        }, {
+            engagementScore: -1,
+            createdAt: -1,
+            _id: -1
+        }, parseInt(limit, 10) + 10);
 
-        // Fetch public posts NOT from current user
-        // Using sample for randomness
-        const posts = await Post.aggregate([
-            { $match: { visibility: 'public', isDeleted: false, author: { $ne: userId } } },
-            { $sample: { size: parseInt(limit) } },
-            { $sort: { createdAt: -1 } },
-            { $lookup: { from: 'users', localField: 'author', foreignField: '_id', as: 'author' } },
-            { $unwind: '$author' },
-            { $match: { 'author.isPrivate': { $ne: true } } },
-            { $project: { 'author.password': 0, 'author.email': 0, 'author.blockedUsers': 0 } }
-        ]);
+        const visiblePosts = rawPosts
+            .filter((post) => viewerContext.canSeePost(post))
+            .slice(0, parseInt(limit, 10));
 
+        const posts = await annotatePosts(visiblePosts, viewerContext);
         res.json({ posts });
     } catch (error) {
-        console.error("Error fetching explore feed:", error);
-        res.status(500).json({ message: "Internal server error" });
+        console.error('Error fetching explore feed:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-/**
- * Search posts by content (keywords, hashtags)
- * GET /api/posts/search?q=query
- */
 exports.searchPosts = async (req, res) => {
     try {
         const { q, limit = 20 } = req.query;
-        if (!q) return res.json({ posts: [] });
+        if (!q) {
+            return res.json({ posts: [] });
+        }
 
-        // Simple regex search (case-insensitive)
+        const viewerContext = await getViewerContext(req.user._id);
         const rawPosts = await Post.find({
             content: { $regex: q, $options: 'i' },
-            visibility: 'public',
-            isDeleted: false
+            isDeleted: false,
+            author: { $nin: Array.from(viewerContext.hiddenUserIds) }
         })
-            .sort({ createdAt: -1 })
-            .limit(parseInt(limit))
-            .populate('author', 'username fullname avatar isPrivate')
+            .sort({ createdAt: -1, _id: -1 })
+            .limit(parseInt(limit, 10) + 10)
+            .populate('author', POST_AUTHOR_FIELDS)
+            .populate({
+                path: 'repostOf',
+                populate: { path: 'author', select: POST_AUTHOR_FIELDS }
+            })
             .lean();
 
-        const posts = rawPosts.filter(p => !p.author.isPrivate);
+        const visiblePosts = rawPosts
+            .filter((post) => viewerContext.canSeePost(post))
+            .slice(0, parseInt(limit, 10));
 
+        const posts = await annotatePosts(visiblePosts, viewerContext);
         res.json({ posts });
     } catch (error) {
-        console.error("Error searching posts:", error);
-        res.status(500).json({ message: "Internal server error" });
+        console.error('Error searching posts:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-/**
- * Toggle Like
- * POST /api/posts/:id/like
- */
 exports.toggleLike = async (req, res) => {
     try {
         const postId = req.params.id;
         const userId = req.user._id;
+        const viewerContext = await getViewerContext(userId);
+        const post = await getPostForViewer(postId, viewerContext);
 
-        const post = await Post.findById(postId);
-        if (!post) return res.status(404).json({ message: 'Post not found' });
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
 
         const existingLike = await Like.findOne({ post: postId, user: userId });
 
         if (existingLike) {
-            // Unlike
             await Like.deleteOne({ _id: existingLike._id });
-            await Post.findByIdAndUpdate(postId, { $inc: { likeCount: -1 } });
+            const updatedPost = await Post.findByIdAndUpdate(
+                postId,
+                buildPostMetricsUpdate({ likeDelta: -1 }),
+                { new: true }
+            ).select('likeCount');
 
-            const newCount = post.likeCount - 1;
-            try {
-                getIo().to(`post:${postId}`).emit('post:like:update', { postId, likesCount: newCount });
-            } catch (error) { console.error("Socket emit failed", error); }
-
-            return res.json({ message: 'Post unliked', liked: false, likeCount: newCount });
-        } else {
-            // Like
-            const newLike = new Like({ post: postId, user: userId });
-            await newLike.save();
-            await Post.findByIdAndUpdate(postId, { $inc: { likeCount: 1 } });
-
-            const newCount = post.likeCount + 1;
-            try {
-                getIo().to(`post:${postId}`).emit('post:like:update', { postId, likesCount: newCount });
-            } catch (error) { console.error("Socket emit failed", error); }
-
-            // Create Notification
-            if (post.author.toString() !== userId.toString()) {
-                const notif = new Notification({
-                    recipient: post.author,
-                    sender: userId,
-                    type: 'like',
-                    post: postId
-                });
-                await notif.save();
-                await notif.populate('sender', 'username fullname avatar');
-                getIo().to(`user:${post.author.toString()}`).emit('notification:new', notif);
-            }
-
-            return res.json({ message: 'Post liked', liked: true, likeCount: newCount });
+            emitPostLikeUpdate(postId, updatedPost.likeCount);
+            return res.json({ message: 'Post unliked', liked: false, likeCount: updatedPost.likeCount });
         }
+
+        const newLike = new Like({ post: postId, user: userId });
+        await newLike.save();
+
+        const updatedPost = await Post.findByIdAndUpdate(
+            postId,
+            buildPostMetricsUpdate({ likeDelta: 1 }),
+            { new: true }
+        ).select('likeCount author');
+
+        emitPostLikeUpdate(postId, updatedPost.likeCount);
+        await createAndEmitNotification({
+            recipient: updatedPost.author,
+            sender: userId,
+            type: 'like',
+            post: postId
+        });
+
+        res.json({ message: 'Post liked', liked: true, likeCount: updatedPost.likeCount });
     } catch (error) {
         console.error('Error toggling like:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-/**
- * Add Comment
- * POST /api/posts/:id/comment
- */
 exports.addComment = async (req, res) => {
     try {
         const postId = req.params.id;
         const userId = req.user._id;
         const { content } = req.body;
+        const viewerContext = await getViewerContext(userId);
 
         if (!content || !content.trim()) {
             return res.status(400).json({ message: 'Comment cannot be empty' });
         }
 
-        const post = await Post.findById(postId);
-        if (!post) return res.status(404).json({ message: 'Post not found' });
+        const post = await getPostForViewer(postId, viewerContext);
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
 
         const newComment = new Comment({
             post: postId,
             user: userId,
-            content
+            content: content.trim()
         });
         await newComment.save();
 
-        await Post.findByIdAndUpdate(postId, { $inc: { commentCount: 1 } });
+        const updatedPost = await Post.findByIdAndUpdate(
+            postId,
+            buildPostMetricsUpdate({ commentDelta: 1 }),
+            { new: true }
+        ).select('commentCount author');
 
-        // Build response with author info for immediate UI update
-        const fullComment = await Comment.findById(newComment._id).populate('user', 'username fullname avatar').lean();
+        const fullComment = await Comment.findById(newComment._id)
+            .populate('user', COMMENT_USER_FIELDS)
+            .lean();
 
-        try {
-            getIo().to(`post:${postId}`).emit('post:comment:update', {
-                postId,
-                commentCount: post.commentCount + 1,
-                comment: fullComment
-            });
-        } catch (error) { console.error("Socket emit failed", error); }
+        emitPostCommentUpdate(postId, updatedPost.commentCount);
 
-        // Create Notification
-        if (post.author.toString() !== userId.toString()) {
-            const notif = new Notification({
-                recipient: post.author,
-                sender: userId,
-                type: 'comment',
-                post: postId,
-                comment: newComment._id,
-                text: content
-            });
-            await notif.save();
-            await notif.populate('sender', 'username fullname avatar');
-            getIo().to(`user:${post.author.toString()}`).emit('notification:new', notif);
-        }
+        await createAndEmitNotification({
+            recipient: updatedPost.author,
+            sender: userId,
+            type: 'comment',
+            post: postId,
+            comment: newComment._id,
+            text: content.trim()
+        });
 
-        res.status(201).json(fullComment);
+        res.status(201).json({
+            ...fullComment,
+            liked: false,
+            replies: []
+        });
     } catch (error) {
         console.error('Error adding comment:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-/**
- * Get Comments
- * GET /api/posts/:id/comments
- */
+exports.addReply = async (req, res) => {
+    try {
+        const { postId, commentId } = req.params;
+        const userId = req.user._id;
+        const { content } = req.body;
+        const viewerContext = await getViewerContext(userId);
+
+        if (!content || !content.trim()) {
+            return res.status(400).json({ message: 'Reply cannot be empty' });
+        }
+
+        const post = await getPostForViewer(postId, viewerContext);
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        const parentComment = await Comment.findById(commentId).select('post user parentComment').lean();
+        if (!parentComment || normalizeId(parentComment.post) !== postId) {
+            return res.status(404).json({ message: 'Comment not found' });
+        }
+
+        if (parentComment.parentComment) {
+            return res.status(400).json({ message: 'Replies can only be added to top-level comments' });
+        }
+
+        const reply = new Comment({
+            post: postId,
+            user: userId,
+            content: content.trim(),
+            parentComment: commentId
+        });
+        await reply.save();
+
+        const updatedPost = await Post.findByIdAndUpdate(
+            postId,
+            buildPostMetricsUpdate({ commentDelta: 1 }),
+            { new: true }
+        ).select('commentCount');
+
+        const fullReply = await Comment.findById(reply._id)
+            .populate('user', COMMENT_USER_FIELDS)
+            .lean();
+
+        emitPostCommentUpdate(postId, updatedPost.commentCount);
+
+        await createAndEmitNotification({
+            recipient: parentComment.user,
+            sender: userId,
+            type: 'reply',
+            post: postId,
+            comment: reply._id,
+            text: content.trim()
+        });
+
+        res.status(201).json({
+            ...fullReply,
+            liked: false
+        });
+    } catch (error) {
+        console.error('Error adding reply:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
 exports.getComments = async (req, res) => {
     try {
         const postId = req.params.id;
-        const comments = await Comment.find({ post: postId })
-            .sort({ createdAt: 1 }) // Oldest first (Thread style)
-            .populate('user', 'username fullname avatar')
-            .lean();
+        const viewerContext = await getViewerContext(req.user._id);
+        const post = await getPostForViewer(postId, viewerContext);
 
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        const comments = await buildCommentsPayload(postId, req.user._id);
         res.json(comments);
     } catch (error) {
         console.error('Error fetching comments:', error);
@@ -498,76 +674,160 @@ exports.getComments = async (req, res) => {
     }
 };
 
-/**
- * Repost
- * POST /api/posts/:id/repost
- */
+exports.toggleCommentLike = async (req, res) => {
+    try {
+        const { postId, commentId } = req.params;
+        const userId = req.user._id;
+        const viewerContext = await getViewerContext(userId);
+        const post = await getPostForViewer(postId, viewerContext);
+
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        const comment = await Comment.findById(commentId).select('post user likeCount').lean();
+        if (!comment || normalizeId(comment.post) !== postId) {
+            return res.status(404).json({ message: 'Comment not found' });
+        }
+
+        const existingLike = await CommentLike.findOne({
+            comment: commentId,
+            user: userId
+        });
+
+        if (existingLike) {
+            await CommentLike.deleteOne({ _id: existingLike._id });
+            const updatedComment = await Comment.findByIdAndUpdate(
+                commentId,
+                { $inc: { likeCount: -1 } },
+                { new: true }
+            ).select('likeCount');
+
+            return res.json({
+                message: 'Comment unliked',
+                liked: false,
+                likeCount: updatedComment.likeCount
+            });
+        }
+
+        await CommentLike.create({
+            comment: commentId,
+            user: userId
+        });
+
+        const updatedComment = await Comment.findByIdAndUpdate(
+            commentId,
+            { $inc: { likeCount: 1 } },
+            { new: true }
+        ).select('likeCount user');
+
+        await createAndEmitNotification({
+            recipient: updatedComment.user,
+            sender: userId,
+            type: 'comment_like',
+            post: postId,
+            comment: commentId
+        });
+
+        res.json({
+            message: 'Comment liked',
+            liked: true,
+            likeCount: updatedComment.likeCount
+        });
+    } catch (error) {
+        console.error('Error toggling comment like:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
 exports.repost = async (req, res) => {
     try {
         const targetId = req.params.id;
         const userId = req.user._id;
+        const viewerContext = await getViewerContext(userId);
+        const targetPost = await getPostForViewer(targetId, viewerContext);
 
-        let targetPost = await Post.findById(targetId);
-        if (!targetPost) return res.status(404).json({ message: 'Post not found' });
+        if (!targetPost) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
 
-        // Flatten reposts: If target is a repost, use the original post
-        const originalPostId = targetPost.repostOf ? targetPost.repostOf : targetId;
-
-        // Check if already reposted by this user
+        const originalPostId = targetPost.repostOf ? normalizeId(targetPost.repostOf._id || targetPost.repostOf) : targetId;
         const existingRepost = await Post.findOne({
             author: userId,
             repostOf: originalPostId
         });
 
         if (existingRepost) {
-            // Un-repost (Toggle off)
             await Post.findByIdAndDelete(existingRepost._id);
-            await Post.findByIdAndUpdate(originalPostId, { $inc: { repostCount: -1 } });
+            await Post.findByIdAndUpdate(
+                originalPostId,
+                buildPostMetricsUpdate({ repostDelta: -1 })
+            );
+
             return res.json({ message: 'Repost removed', reposted: false });
-        } else {
-            // Create Repost
-            const newPost = new Post({
-                author: userId,
-                repostOf: originalPostId,
-                visibility: 'public', // Default to public
-                createdAt: new Date()
-            });
-
-            await newPost.save();
-            await Post.findByIdAndUpdate(originalPostId, { $inc: { repostCount: 1 } });
-
-            return res.status(201).json({ message: 'Reposted successfully', reposted: true, post: newPost });
         }
 
+        const newPost = new Post({
+            author: userId,
+            repostOf: originalPostId,
+            visibility: 'public',
+            createdAt: new Date()
+        });
+
+        await newPost.save();
+        await Post.findByIdAndUpdate(
+            originalPostId,
+            buildPostMetricsUpdate({ repostDelta: 1 })
+        );
+
+        res.status(201).json({ message: 'Reposted successfully', reposted: true, post: newPost });
     } catch (error) {
         console.error('Error reposting:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-/**
- * Delete Comment
- * DELETE /api/posts/:postId/comments/:commentId
- */
 exports.deleteComment = async (req, res) => {
     try {
         const { postId, commentId } = req.params;
         const userId = req.user._id;
+        const viewerContext = await getViewerContext(userId);
+        const post = await getPostForViewer(postId, viewerContext);
 
-        const comment = await Comment.findById(commentId);
-        if (!comment) return res.status(404).json({ message: 'Comment not found' });
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
 
-        const post = await Post.findById(postId);
-        if (!post) return res.status(404).json({ message: 'Post not found' });
+        const comment = await Comment.findById(commentId).select('post user parentComment').lean();
+        if (!comment || normalizeId(comment.post) !== postId) {
+            return res.status(404).json({ message: 'Comment not found' });
+        }
 
-        // Authorization: Comment Author OR Post Author can delete
-        if (comment.user.toString() !== userId.toString() && post.author.toString() !== userId.toString()) {
+        if (normalizeId(comment.user) !== normalizeId(userId) && normalizeId(post.author._id) !== normalizeId(userId)) {
             return res.status(403).json({ message: 'Unauthorized to delete this comment' });
         }
 
-        await Comment.deleteOne({ _id: commentId });
-        await Post.findByIdAndUpdate(postId, { $inc: { commentCount: -1 } });
+        let deletedCommentIds = [commentId];
+        if (!comment.parentComment) {
+            const replies = await Comment.find({
+                post: postId,
+                parentComment: commentId
+            }).select('_id').lean();
+            deletedCommentIds = [commentId, ...replies.map((reply) => normalizeId(reply._id))];
+        }
 
+        await Promise.all([
+            Comment.deleteMany({ _id: { $in: deletedCommentIds } }),
+            CommentLike.deleteMany({ comment: { $in: deletedCommentIds } })
+        ]);
+
+        const updatedPost = await Post.findByIdAndUpdate(
+            postId,
+            buildPostMetricsUpdate({ commentDelta: -deletedCommentIds.length }),
+            { new: true }
+        ).select('commentCount');
+
+        emitPostCommentUpdate(postId, updatedPost.commentCount);
         res.json({ message: 'Comment deleted' });
     } catch (error) {
         console.error('Error deleting comment:', error);

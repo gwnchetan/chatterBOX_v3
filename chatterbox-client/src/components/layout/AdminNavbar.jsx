@@ -4,6 +4,7 @@ import BrandLogo from '../common/BrandLogo';
 import { Grid, User, LogOut, Home } from '../common/Icons';
 import Avatar from '../common/Avatar';
 import '../layout/Navbar.css'; // Reuse basic navbar styles for consistency
+import { socketService } from '../../services/socket.service';
 
 const AdminNavbar = ({ activeView, setView }) => {
     const navigate = useNavigate();
@@ -12,6 +13,7 @@ const AdminNavbar = ({ activeView, setView }) => {
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        socketService.clearAuthSession();
         navigate('/');
     };
 

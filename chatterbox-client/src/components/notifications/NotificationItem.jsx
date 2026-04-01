@@ -3,80 +3,103 @@ import { Link, useNavigate } from 'react-router-dom';
 import Avatar from '../common/Avatar';
 import { Heart, MessageSquare, UserPlus, Zap } from '../common/Icons';
 import userService from '../../services/user.service';
-import { useToast } from '../Toast'; // Assuming Hook exists
+import { useToast } from '../Toast';
 
 const NotificationItem = ({ notification }) => {
-    const { sender, type, text, createdAt, post, read } = notification;
+    const { sender, type, createdAt, post, read, conversation } = notification;
     const navigate = useNavigate();
     const toast = useToast();
     const [actionStatus, setActionStatus] = useState(null);
 
-    // Robust ID extraction
     const senderId = sender?._id || sender?.id;
 
-    const handleAccept = async (e) => {
-        e.stopPropagation();
+    const handleAccept = async (event) => {
+        event.stopPropagation();
         if (!senderId) {
-            console.error("Notification missing sender ID:", notification);
-            toast.error("Error: Invalid request data");
+            toast.error('Error: Invalid request data');
             return;
         }
 
         try {
             await userService.acceptFollowRequest(senderId);
             setActionStatus('accepted');
-            toast.success("Request accepted");
-        } catch (err) {
-            console.error(err);
-            toast.error("Failed to accept");
+            toast.success('Request accepted');
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to accept');
         }
     };
 
-    const handleReject = async (e) => {
-        e.stopPropagation();
+    const handleReject = async (event) => {
+        event.stopPropagation();
         if (!senderId) return;
 
         try {
             await userService.rejectFollowRequest(senderId);
             setActionStatus('rejected');
-            toast.success("Request rejected");
-        } catch (err) {
-            console.error(err);
-            toast.error("Failed to reject");
+            toast.success('Request rejected');
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to reject');
         }
     };
 
     const renderIcon = () => {
         switch (type) {
-            case 'like': return <Heart size={10} fill="white" stroke="white" />;
-            case 'comment': return <MessageSquare size={10} fill="white" stroke="white" />;
-            case 'follow': return <UserPlus size={10} stroke="white" />;
-            case 'request': return <UserPlus size={10} stroke="white" />;
-            default: return <Zap size={10} stroke="white" />;
+            case 'like':
+            case 'comment_like':
+                return <Heart size={10} fill="white" stroke="white" />;
+            case 'comment':
+            case 'reply':
+            case 'message':
+                return <MessageSquare size={10} fill="white" stroke="white" />;
+            case 'follow':
+            case 'request':
+                return <UserPlus size={10} stroke="white" />;
+            default:
+                return <Zap size={10} stroke="white" />;
         }
     };
 
     const getIconBgColor = () => {
         switch (type) {
-            case 'like': return 'var(--color-error)';
-            case 'comment': return 'var(--color-primary)';
-            case 'follow': return 'var(--color-success)';
-            case 'request': return 'var(--color-primary)';
-            default: return 'var(--color-text-muted)';
+            case 'like':
+            case 'comment_like':
+                return 'var(--color-error)';
+            case 'comment':
+            case 'reply':
+            case 'message':
+                return 'var(--color-primary)';
+            case 'follow':
+                return 'var(--color-success)';
+            case 'request':
+                return 'var(--color-primary)';
+            default:
+                return 'var(--color-text-muted)';
         }
     };
 
     const renderMessage = () => {
         switch (type) {
-            case 'like': return "Liked your post";
-            case 'comment': return "Commented on your post";
-            case 'follow': return "Started following you";
-            case 'request': return "requested to follow you";
-            default: return "Sent a notification";
+            case 'like':
+                return 'Liked your post';
+            case 'comment':
+                return 'Commented on your post';
+            case 'follow':
+                return 'Started following you';
+            case 'request':
+                return 'Requested to follow you';
+            case 'message':
+                return 'Sent you a message request';
+            case 'reply':
+                return 'Replied to your comment';
+            case 'comment_like':
+                return 'Liked your comment';
+            default:
+                return 'Sent a notification';
         }
     };
 
-    // Simple time ago helper
     const timeAgo = (dateStr) => {
         const date = new Date(dateStr);
         const now = new Date();
@@ -92,43 +115,49 @@ const NotificationItem = ({ notification }) => {
     };
 
     const handleItemClick = () => {
-        if (post && post._id) {
-            navigate(`/post/${post._id}`);
+        if (conversation?._id) {
+            navigate(`/chat/${conversation._id}`);
+            return;
+        }
+
+        if (post?._id) {
+            navigate(`/feed`);
         }
     };
 
     return (
-        <div className={`notification-item`} onClick={handleItemClick}>
-            {/* Unread Dot (Left) */}
+        <div className="notification-item" onClick={handleItemClick}>
             {!read && <div className="unread-indicator"></div>}
 
-            {/* Avatar with Badge */}
-            <div className="notif-avatar-wrapper" onClick={(e) => e.stopPropagation()}>
+            <div className="notif-avatar-wrapper" onClick={(event) => event.stopPropagation()}>
                 <Link to={`/profile/${senderId}`}>
-                    <Avatar src={sender.avatar} size="md" />
+                    <Avatar src={sender?.avatar} size="md" />
                 </Link>
                 <div className="notif-icon-badge" style={{ backgroundColor: getIconBgColor() }}>
                     {renderIcon()}
                 </div>
             </div>
 
-            {/* Content (Middle) */}
             <div className="notif-content">
                 <div className="notif-text">
                     <span
                         className="notif-user"
-                        onClick={(e) => {
-                            e.stopPropagation();
+                        onClick={(event) => {
+                            event.stopPropagation();
                             navigate(`/profile/${senderId}`);
                         }}
                     >
-                        {sender.fullname || sender.username}
-                    </span>
+                        {sender?.fullname || sender?.username}
+                    </span>{' '}
                     {renderMessage()}
                 </div>
 
                 {type === 'request' && !actionStatus && (
-                    <div className="notif-actions" style={{ display: 'flex', gap: '8px', marginTop: '6px' }} onClick={(e) => e.stopPropagation()}>
+                    <div
+                        className="notif-actions"
+                        style={{ display: 'flex', gap: '8px', marginTop: '6px' }}
+                        onClick={(event) => event.stopPropagation()}
+                    >
                         <button
                             onClick={handleAccept}
                             style={{
@@ -141,7 +170,9 @@ const NotificationItem = ({ notification }) => {
                                 fontWeight: '600',
                                 cursor: 'pointer'
                             }}
-                        >Confirm</button>
+                        >
+                            Confirm
+                        </button>
                         <button
                             onClick={handleReject}
                             style={{
@@ -154,9 +185,12 @@ const NotificationItem = ({ notification }) => {
                                 fontWeight: '600',
                                 cursor: 'pointer'
                             }}
-                        >Delete</button>
+                        >
+                            Delete
+                        </button>
                     </div>
                 )}
+
                 {actionStatus && (
                     <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
                         {actionStatus === 'accepted' ? 'Request Accepted' : 'Request Removed'}
@@ -166,8 +200,7 @@ const NotificationItem = ({ notification }) => {
                 <span className="notif-time">{timeAgo(createdAt)}</span>
             </div>
 
-            {/* Post Preview (Right) */}
-            {post && post.media && post.media[0] && (
+            {post?.media?.[0] && (
                 <div className="notif-post-preview">
                     {post.media[0].type === 'image' ? (
                         <img src={post.media[0].url} alt="post" />

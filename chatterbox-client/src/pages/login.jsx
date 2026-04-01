@@ -7,6 +7,7 @@ import { useGoogleLogin } from '@react-oauth/google';
 import loginIllustration from '../assets/login.png';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { socketService } from '../services/socket.service';
 
 function Login() {
     const navigate = useNavigate();
@@ -118,6 +119,10 @@ function Login() {
                 success("Google Login Successful!");
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('user', JSON.stringify(data.user)); // Fixed: data.user instead of res.data.user
+                socketService.setAuthSession({
+                    token: data.token,
+                    userId: data.user._id || data.user.id
+                });
                 console.log("Navigating to feed...");
                 navigate('/feed');
 
@@ -172,6 +177,10 @@ function Login() {
                 // Save token and user data
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('user', JSON.stringify(data.user));
+                socketService.setAuthSession({
+                    token: data.token,
+                    userId: data.user._id || data.user.id
+                });
                 navigate('/feed');
             } else {
                 // If registered, maybe switch to login view automatically

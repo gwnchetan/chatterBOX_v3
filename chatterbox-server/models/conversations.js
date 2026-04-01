@@ -34,6 +34,9 @@ const conversationSchema = new mongoose.Schema({
     requestedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
+    },
+    rejectedAt: {
+        type: Date
     }
 }, {
     timestamps: true

@@ -108,9 +108,37 @@
 
 .toast-content {
     flex: 1;
+    min-width: 0;
     font-size: var(--text-sm);
     font-weight: 500;
     line-height: 1.4;
+}
+
+.toast-content--rich {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.toast-title {
+    color: var(--text-main);
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.toast-message {
+    color: var(--text-main);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.toast-content--rich .toast-message {
+    color: var(--text-secondary, var(--text-main));
+    font-weight: 400;
+}
+
+.toast-icon--avatar {
+    align-self: flex-start;
 }
 
 /* Close Button */

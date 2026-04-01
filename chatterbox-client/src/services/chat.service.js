@@ -3,9 +3,10 @@ import api from './api';
 const chatService = {
     /**
      * Get all conversations for the current user
+     * @param {string} type - 'inbox' | 'requests' | 'sent'
      */
-    getConversations: async () => {
-        const response = await api.get('/chat/conversations');
+    getConversations: async (type = 'inbox') => {
+        const response = await api.get(`/chat/conversations?type=${type}`);
         return response.data;
     },
 

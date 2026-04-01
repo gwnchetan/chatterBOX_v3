@@ -3,30 +3,71 @@ import { io } from 'socket.io-client';
 const SOCKET_URL = import.meta.env.MODE === 'production' ? '/' : 'http://localhost:5000';
 
 class SocketService {
-    socket = null;
+    constructor() {
+        this._socket = null;
+        this._token = null;
+        this._userId = null;
+    }
+
+    setAuthSession({ token, userId }) {
+        this._token = token || null;
+        this._userId = userId || null;
+
+        if (!this._token || !this._userId) {
+            this.disconnect();
+            return null;
+        }
+
+        if (this._socket) {
+            return this._socket;
+        }
+
+        return this.connect();
+    }
+
+    restoreSession() {
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        const userId = user?._id || user?.id;
+
+        if (!token || !userId) {
+            this.clearAuthSession();
+            return null;
+        }
+
+        return this.setAuthSession({ token, userId });
+    }
+
+    clearAuthSession() {
+        this._token = null;
+        this._userId = null;
+        this.disconnect();
+    }
 
     connect() {
-        if (this.socket) return; // Already connected
+        if (!this._token || !this._userId) {
+            return null;
+        }
 
-        const token = localStorage.getItem('token');
-        if (!token) return;
+        if (this._socket) {
+            return this._socket;
+        }
 
-        this.socket = io(SOCKET_URL, {
-            auth: { token },
-            query: { token },
+        const socket = io(SOCKET_URL, {
+            auth: { token: this._token },
+            query: { token: this._token },
             transports: ['websocket'],
             reconnection: true,
-            reconnectionAttempts: 5,
+            reconnectionAttempts: 10,
             reconnectionDelay: 1000
         });
 
-        this.socket.on('connect', () => {
-            console.log('Socket connected:', this.socket.id);
+        socket.on('connect', () => {
+            this.joinUser(this._userId);
         });
 
-        this.socket.on('connect_error', (err) => {
-            console.error('Socket connection error:', err);
-        });
+        this._socket = socket;
+        return socket;
     }
 
     disconnect() {
@@ -40,6 +81,10 @@ class SocketService {
         return this._socket;
     }
 
+    get isConnected() {
+        return !!this._socket?.connected;
+    }
+
     joinPost(postId) {
         if (this._socket && postId) {
             this._socket.emit('join_post', postId);
@@ -47,26 +92,38 @@ class SocketService {
     }
 
     leavePost(postId) {
-        if (this.socket && postId) {
-            this.socket.emit('leave_post', postId);
+        if (this._socket && postId) {
+            this._socket.emit('leave_post', postId);
         }
     }
 
-    joinUser(userId) {
-        if (this.socket && userId) {
-            this.socket.emit('join_user', userId);
+    joinUser(userId = this._userId) {
+        if (this._socket && userId) {
+            this._socket.emit('join_user', userId);
+        }
+    }
+
+    joinChat(conversationId) {
+        if (this._socket && conversationId) {
+            this._socket.emit('join_chat', conversationId);
+        }
+    }
+
+    leaveChat(conversationId) {
+        if (this._socket && conversationId) {
+            this._socket.emit('leave_chat', conversationId);
         }
     }
 
     on(event, callback) {
-        if (this.socket) {
-            this.socket.on(event, callback);
+        if (this._socket) {
+            this._socket.on(event, callback);
         }
     }
 
     off(event, callback) {
-        if (this.socket) {
-            this.socket.off(event, callback);
+        if (this._socket) {
+            this._socket.off(event, callback);
         }
     }
 }

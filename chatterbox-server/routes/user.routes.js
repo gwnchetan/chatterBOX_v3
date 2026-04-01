@@ -10,6 +10,7 @@ const authMiddleware = require('../middleware/auth.middleware'); // Assuming it 
 router.get('/search', authMiddleware, userController.searchUsers);
 router.get('/saved', authMiddleware, userController.getSavedPosts); // Get my saved posts
 router.get('/following', authMiddleware, userController.getFollowing); // Get users I follow
+router.get('/blocked', authMiddleware, userController.getBlockedUsers);
 
 // Save/Unsave actions (Must be before /:userId)
 router.post('/save/:postId', authMiddleware, userController.savePost);
@@ -30,5 +31,7 @@ router.post('/:userId/follow', authMiddleware, userController.followUser);
 router.post('/:userId/unfollow', authMiddleware, userController.unfollowUser);
 router.post('/:userId/accept', authMiddleware, userController.acceptFollowRequest);
 router.post('/:userId/reject', authMiddleware, userController.rejectFollowRequest);
+router.post('/:userId/block', authMiddleware, userController.blockUser);
+router.post('/:userId/unblock', authMiddleware, userController.unblockUser);
 
 module.exports = router;

@@ -7,7 +7,9 @@ exports.getNotifications = async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(20)
             .populate('sender', 'username fullname avatar')
-            .populate('post', 'content media'); // To show snippet of post
+            .populate('post', 'content media')
+            .populate('comment', 'content parentComment')
+            .populate('conversation', 'participants status lastMessage');
 
         res.json(notifications);
     } catch (error) {

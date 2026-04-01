@@ -5,6 +5,7 @@ import BrandLogo from '../common/BrandLogo';
 import { Home, Grid, Bookmark, Send, BarChart, Settings, LogOut, User, Plus, MessageSquare } from '../common/Icons';
 import SettingsModal from '../common/SettingsModal';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { socketService } from '../../services/socket.service';
 
 const Navbar = () => {
     const navigate = useNavigate();
@@ -76,6 +77,7 @@ const Navbar = () => {
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        socketService.clearAuthSession();
         navigate('/');
     };
 

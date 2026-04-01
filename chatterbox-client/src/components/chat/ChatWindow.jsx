@@ -1,19 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInView } from 'react-intersection-observer';
 import chatService from '../../services/chat.service';
+import { socketService } from '../../services/socket.service';
 import MessageBubble from './MessageBubble';
 import Avatar from '../common/Avatar';
-import { Send, MoreHorizontal, Phone, Video } from '../common/Icons';
-import { useInView } from 'react-intersection-observer';
 import LogoLoader from '../common/LogoLoader';
+import { Send, MoreHorizontal, Phone, Video } from '../common/Icons';
 
 const ChatWindow = ({ conversationId, conversation, currentUser }) => {
-    const [newMessage, setNewMessage] = useState('');
     const queryClient = useQueryClient();
+    const [newMessage, setNewMessage] = useState('');
     const bottomRef = useRef(null);
     const textareaRef = useRef(null);
 
-    // Fetch Messages
     const {
         data,
         fetchNextPage,
@@ -23,48 +23,44 @@ const ChatWindow = ({ conversationId, conversation, currentUser }) => {
     } = useInfiniteQuery({
         queryKey: ['messages', conversationId],
         queryFn: ({ pageParam = null }) => chatService.getMessages(conversationId, pageParam),
-        getNextPageParam: (lastPage) => lastPage.length > 0 ? lastPage[0].createdAt : undefined, // Assuming API returns newest last? No, usually API returns chunk. 
-        // Backend: .sort({ createdAt: 1 }) -> Oldest first? 
-        // Wait, standard chat is Newest at bottom.
-        // If backend returns Oldest -> Newest (1..50), user sees 50 at bottom.
-        // Previous page should be (before: timestamp of 1).
-        // Let's assume standard behavior: API returns simple list. define getNextPageParam to use oldest message date.
-        select: (data) => ({
-            pages: [...data.pages].reverse(), // Reverse pages so page 0 (latest) is at bottom
-            pageParams: [...data.pageParams].reverse(),
-        }),
-        // Actually simplest is: API returns N messages before T.
-        // We want to render them in chronological order.
+        getNextPageParam: (lastPage) => lastPage.length === 50 ? lastPage[0].createdAt : undefined,
         enabled: !!conversationId,
-        staleTime: Infinity,
+        staleTime: 1000 * 30,
+        initialPageParam: null
     });
 
-    // We need to invert the data for display: 
-    // Data.pages[0] is the LATEST chunk (closest to now).
-    // Data.pages[N] is the OLDEST chunk.
-    // We want to render Oldest -> Newest.
+    const messagePages = data?.pages || [];
+    const messages = messagePages.length
+        ? [...messagePages].reverse().flatMap((page) => page)
+        : [];
 
-    // FlatMap and Sort
-    const messages = data?.pages.flatMap(page => page).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)) || [];
-
-    // Scroll to bottom on initial load or new message (if near bottom)
     useEffect(() => {
-        if (!isLoading) {
-            bottomRef.current?.scrollIntoView({ behavior: 'auto' });
-        }
-    }, [conversationId, isLoading]);
+        if (!conversationId) return;
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [conversationId, messages.length]);
 
-    // Send Mutation
+    useEffect(() => {
+        if (!conversationId || conversation?.status !== 'active') return;
+        socketService.joinChat(conversationId);
+
+        return () => {
+            socketService.leaveChat(conversationId);
+        };
+    }, [conversation?.status, conversationId]);
+
+    useEffect(() => {
+        if (!conversationId || conversation?.status !== 'active') return;
+        chatService.markAsRead(conversationId).catch(() => {});
+    }, [conversation?.status, conversationId, messages.length]);
+
     const sendMessageMutation = useMutation({
         mutationFn: (content) => chatService.sendMessage(conversationId, content),
         onMutate: async (content) => {
-            await queryClient.cancelQueries(['messages', conversationId]);
+            await queryClient.cancelQueries({ queryKey: ['messages', conversationId] });
             const previousMessages = queryClient.getQueryData(['messages', conversationId]);
 
-            // Optimistic Update
-            const tempId = Math.random().toString();
             const optimisticMessage = {
-                _id: tempId,
+                _id: `temp-${Date.now()}`,
                 conversationId,
                 sender: currentUser,
                 content,
@@ -72,111 +68,88 @@ const ChatWindow = ({ conversationId, conversation, currentUser }) => {
                 status: 'sending'
             };
 
-            queryClient.setQueryData(['messages', conversationId], (old) => {
-                if (!old) return { pages: [[optimisticMessage]], pageParams: [null] };
-                const newPages = [...old.pages];
-                newPages[0] = [...newPages[0], optimisticMessage]; // Add to latest page
-                return { ...old, pages: newPages };
+            queryClient.setQueryData(['messages', conversationId], (oldData) => {
+                if (!oldData?.pages?.length) {
+                    return {
+                        pages: [[optimisticMessage]],
+                        pageParams: [null]
+                    };
+                }
+
+                const newPages = [...oldData.pages];
+                newPages[0] = [...newPages[0], optimisticMessage];
+                return { ...oldData, pages: newPages };
             });
 
             setNewMessage('');
-            // Scroll to bottom
-            setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 10);
-
             return { previousMessages };
         },
-        onError: (err, newTodo, context) => {
-            queryClient.setQueryData(['messages', conversationId], context.previousMessages);
+        onError: (_error, _content, context) => {
+            if (context?.previousMessages) {
+                queryClient.setQueryData(['messages', conversationId], context.previousMessages);
+            }
         },
         onSettled: () => {
-            queryClient.invalidateQueries(['messages', conversationId]);
-            queryClient.invalidateQueries(['conversations']); // Update last message in list
-        },
+            queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        }
     });
 
-    const handleSend = (e) => {
-        e.preventDefault();
+    const handleSend = (event) => {
+        event.preventDefault();
         if (!newMessage.trim()) return;
-        sendMessageMutation.mutate({ text: newMessage });
+        sendMessageMutation.mutate({ text: newMessage.trim() });
     };
 
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            handleSend(e);
+    const handleKeyDown = (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            handleSend(event);
         }
     };
 
-    // Auto-resize textarea
     useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-        }
+        if (!textareaRef.current) return;
+        textareaRef.current.style.height = 'auto';
+        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }, [newMessage]);
 
-
-    // Intersection Observer for Infinite Scroll (Top of list)
     const { ref: topRef, inView } = useInView();
     useEffect(() => {
         if (inView && hasNextPage) {
             fetchNextPage();
         }
-    }, [inView, hasNextPage, fetchNextPage]);
+    }, [fetchNextPage, hasNextPage, inView]);
 
-    // Request Handling
     const handleAccept = async () => {
         try {
             await chatService.acceptRequest(conversationId);
-            queryClient.invalidateQueries(['conversations']);
-        } catch (e) { console.error(e); }
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        } catch (error) {
+            console.error(error);
+        }
     };
 
     const handleReject = async () => {
         try {
             await chatService.rejectRequest(conversationId);
-            queryClient.invalidateQueries(['conversations']);
-            // Navigate away? Or show "Rejected" state using state?
-            // Usually navigate back to empty state.
-        } catch (e) { console.error(e); }
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        } catch (error) {
+            console.error(error);
+        }
     };
 
-
     if (!conversationId) {
-        return (
-            <div className="chat-window-empty">
-                <div className="empty-state-content">
-                    {/* Floating Icons Background (Optional CSS enhancement) */}
-                    <div className="empty-icon-wrapper">
-                        {/* We can use MessageSquare or BrandLogo */}
-                        <div className="brand-logo-large">
-                            <span>C</span>
-                        </div>
-                    </div>
-                    <h2 className="empty-title">Your Messages</h2>
-                    <p className="empty-subtitle">Send private photos and messages to a friend or group.</p>
-                    <button className="btn-start-new" onClick={() => {
-                        // Logic to focus search or open 'new chat' modal
-                        // For now just focus search input if possible, or do nothing specific visually other than ripple
-                        document.querySelector('.conversation-search input')?.focus();
-                    }}>
-                        Send Message
-                    </button>
-                </div>
-            </div>
-        );
+        return <div className="chat-window-empty" />;
     }
 
-    // Determine Status
     const isPending = conversation?.status === 'pending';
-    const isRequester = conversation?.requestedBy === currentUser?._id || conversation?.requestedBy?._id === currentUser?._id;
+    const requesterId = conversation?.requestedBy?._id || conversation?.requestedBy;
+    const isRequester = requesterId === currentUser?._id;
     const isReceiver = isPending && !isRequester;
-
-    // Identify Other User (Header)
-    const otherUser = conversation?.participants?.find(p => p?._id !== currentUser?._id) || { fullname: 'Chat' };
+    const otherUser = conversation?.participants?.find((participant) => participant?._id !== currentUser?._id) || { fullname: 'Chat' };
 
     return (
         <div className="chat-window-container">
-            {/* Header */}
             <header className="chat-header">
                 <div className="chat-header-user">
                     <Avatar src={otherUser.avatar} size="sm" />
@@ -192,12 +165,11 @@ const ChatWindow = ({ conversationId, conversation, currentUser }) => {
                 </div>
             </header>
 
-            {/* Request Banner */}
             {isReceiver && (
                 <div className="request-banner">
                     <div className="request-banner-content">
                         <p><strong>{otherUser.fullname}</strong> wants to send you a message.</p>
-                        <p className="subtext">They won't know you've seen this request until you accept.</p>
+                        <p className="subtext">They will only be able to keep chatting after you accept.</p>
                         <div className="request-actions">
                             <button className="btn-reject" onClick={handleReject}>Reject</button>
                             <button className="btn-accept" onClick={handleAccept}>Accept</button>
@@ -208,51 +180,55 @@ const ChatWindow = ({ conversationId, conversation, currentUser }) => {
 
             {isRequester && isPending && (
                 <div className="request-banner">
-                    <p>Request sent. You can send messages, but {otherUser.fullname} must accept before they see them.</p>
+                    <p>Request sent. You can send one message while this request is pending.</p>
                 </div>
             )}
 
-            {/* Messages Area */}
             <div className="chat-messages">
                 <div ref={topRef} className="scroll-trigger" />
                 {isFetchingNextPage && <LogoLoader size="1.5rem" />}
 
-                {messages.map((msg, index) => {
-                    // Safe access to sender and current user
-                    const senderId = msg.sender?._id || msg.sender;
-                    const currentUserId = currentUser?.id || currentUser?._id;
+                {isLoading && <LogoLoader size="2rem" text="Loading messages..." />}
 
-                    const isOwn = senderId === currentUserId;
-                    const showAvatar = !isOwn && (index === 0 || (messages[index - 1].sender?._id || messages[index - 1].sender) !== senderId);
+                {messages.map((message, index) => {
+                    const senderId = message.sender?._id || message.sender;
+                    const isOwn = senderId === currentUser?._id;
+                    const previousSenderId = messages[index - 1]?.sender?._id || messages[index - 1]?.sender;
+                    const showAvatar = !isOwn && previousSenderId !== senderId;
 
                     return (
                         <MessageBubble
-                            key={msg._id}
-                            message={msg}
+                            key={message._id}
+                            message={message}
                             isOwn={isOwn}
                             showAvatar={showAvatar}
-                            sender={msg.sender}
+                            sender={message.sender}
                         />
                     );
                 })}
                 <div ref={bottomRef} />
             </div>
 
-            {/* Input Area (Blocked if Pending for Receiver) */}
-            {!isReceiver && (
+            {(!isReceiver && !(isRequester && isPending && messages.length > 0)) && (
                 <form className="chat-input-area" onSubmit={handleSend}>
                     <textarea
                         ref={textareaRef}
                         value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
+                        onChange={(event) => setNewMessage(event.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Type a message..."
+                        placeholder={isPending ? 'Send a message request...' : 'Type a message...'}
                         rows={1}
                     />
                     <button type="submit" disabled={!newMessage.trim()} className="send-btn">
                         <Send size={20} />
                     </button>
                 </form>
+            )}
+
+            {(isRequester && isPending && messages.length > 0) && (
+                <div className="p-4 text-center text-gray-500 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-sm">Request sent. You can send more messages once accepted.</p>
+                </div>
             )}
         </div>
     );

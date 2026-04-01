@@ -3,32 +3,20 @@ import Avatar from '../common/Avatar';
 import { Search } from '../common/Icons';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import chatService from '../../services/chat.service';
 
-const ConversationList = ({ conversations, followingList, activeId, onlineUsers, currentUserId }) => {
+const ConversationList = ({ conversations, followingList, activeId, onlineUsers, currentUserId, activeTab, setActiveTab, requestCount }) => {
     const [filter, setFilter] = useState('');
-    const [activeTab, setActiveTab] = useState('inbox'); // 'inbox' | 'requests'
     const navigate = useNavigate();
 
-    // 1. Separate Conversations
-    const inboxConversations = conversations?.filter(c =>
-        c.status === 'active' ||
-        (c.status === 'pending' && c.requestedBy === currentUserId) // Show my sent requests in inbox? Or separate? detailed design says Requests tab is for received.
-        // Let's keep sent requests in inbox for now, or hide them. 
-        // Better: Inbox = Active + Sent Requests. Requests Tab = Received Requests.
-    ) || [];
-
-    const requestConversations = conversations?.filter(c =>
-        c.status === 'pending' && c.requestedBy !== currentUserId
-    ) || [];
-
-    // 2. Filter Logic
-    const getFiltered = (list) => list.filter(c => {
+    // Filter Logic (Search)
+    const getFiltered = (list) => list?.filter(c => {
         const other = c.participants?.find(p => p?._id !== currentUserId) || c.participants?.[0];
         return other?.fullname?.toLowerCase().includes(filter.toLowerCase()) ||
             other?.username?.toLowerCase().includes(filter.toLowerCase());
-    });
+    }) || [];
 
-    const displayedConversations = activeTab === 'inbox' ? getFiltered(inboxConversations) : getFiltered(requestConversations);
+    const displayedConversations = getFiltered(conversations);
 
     // 3. Handle Select
     const handleSelect = (id) => {
@@ -38,27 +26,12 @@ const ConversationList = ({ conversations, followingList, activeId, onlineUsers,
     // 4. Handle Starting Chat from Following
     const handleStartChat = async (targetUserId) => {
         try {
-            // Initiate (get existing or create)
-            // We need chatService here. 
-            // Better: Navigate to profile? Or just initiate.
-            // Let's import chatService.
-            // Wait, we can't easily import standard service if used in component without props? 
-            // We can imports service directly.
-            navigate(`/profile/${targetUserId}`); // Simplest: Go to profile to message. 
-            // User asked to "show list ... add them into chat".
-            // If I click, it should open chat.
-            // Implies: navigate to /chat/new?userId=... or API call.
-            // Let's try to find if conversation exists in our list first.
             const existing = conversations?.find(c => c.participants.some(p => p._id === targetUserId));
             if (existing) {
                 navigate(`/chat/${existing._id}`);
             } else {
-                // We need to trigger initiate. 
-                // We can use a direct service call here? Yes.
-                // But better to navigate to profile for now to rely on existing 'handleMessage'.
-                // OR dispatch an event?
-                // Let's just use navigate to profile for safety/reuse.
-                navigate(`/profile/${targetUserId}`);
+                const conversation = await chatService.initiateConversation(targetUserId);
+                navigate(`/chat/${conversation._id}`);
             }
         } catch (e) { console.error(e); }
     };
@@ -81,7 +54,7 @@ const ConversationList = ({ conversations, followingList, activeId, onlineUsers,
                         onClick={() => setActiveTab('requests')}
                     >
                         Requests
-                        {requestConversations.length > 0 && <span className="badge">{requestConversations.length}</span>}
+                        {requestCount > 0 && <span className="badge">{requestCount}</span>}
                     </button>
                 </div>
 
@@ -121,6 +94,7 @@ const ConversationList = ({ conversations, followingList, activeId, onlineUsers,
                     const otherUser = conv.participants?.find(p => p?._id !== currentUserId) || conv.participants?.[0];
                     const isOnline = onlineUsers?.has(otherUser?._id);
                     const isActive = conv._id === activeId;
+                    const requestedBy = conv.requestedBy?._id || conv.requestedBy;
 
                     return (
                         <div
@@ -143,11 +117,11 @@ const ConversationList = ({ conversations, followingList, activeId, onlineUsers,
                                 </div>
                                 <div className="conversation-bottom">
                                     <p className="conversation-preview">
-                                        {conv.status === 'pending' && conv.requestedBy !== currentUserId ? (
+                                        {conv.status === 'pending' && requestedBy !== currentUserId ? (
                                             <span className="request-text">Message Request</span>
                                         ) : (
                                             <>
-                                                {conv.lastMessage?.sender === currentUserId && 'You: '}
+                                                {(conv.lastMessage?.sender?._id || conv.lastMessage?.sender) === currentUserId && 'You: '}
                                                 {conv.lastMessage?.text || (conv.status === 'pending' ? 'Request Sent' : 'No messages')}
                                             </>
                                         )}

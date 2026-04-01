@@ -18,6 +18,8 @@ router.delete('/:id', postsController.deletePost);
 router.post('/:id/like', postsController.toggleLike);
 router.post('/:id/repost', postsController.repost);
 router.post('/:id/comment', postsController.addComment);
+router.post('/:postId/comments/:commentId/reply', postsController.addReply);
+router.post('/:postId/comments/:commentId/like', postsController.toggleCommentLike);
 router.get('/:id/comments', postsController.getComments);
 router.delete('/:postId/comments/:commentId', postsController.deleteComment);
 

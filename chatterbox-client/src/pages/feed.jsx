@@ -1,18 +1,35 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import './feed.css';
+import { Virtuoso } from 'react-virtuoso';
 import Navbar from '../components/layout/Navbar';
 import RightSidebar from '../components/layout/RightSidebar';
 import PostCard from '../components/feed/PostCard';
 import MobileNavbar from '../components/layout/MobileNavbar';
-import { postsService } from '../services/posts.service';
-import { useToast } from '../components/Toast';
-import LogoLoader from '../components/common/LogoLoader';
 import PostSkeleton from '../components/feed/PostSkeleton';
-import { Virtuoso } from 'react-virtuoso';
+import LogoLoader from '../components/common/LogoLoader';
+import { postsService } from '../services/posts.service';
 import { useFeed } from '../context/FeedContext';
+import './feed.css';
+
+const FEED_SECTIONS = [
+    { id: 'friends', label: 'Friends' },
+    { id: 'recents', label: 'Recents' },
+    { id: 'popular', label: 'Popular' }
+];
+const EMPTY_PAGES = [];
+
+const extractPostsForContext = (pages = []) => pages
+    .flatMap((page) => page.posts || [])
+    .flatMap((post) => {
+        const extracted = [post];
+        if (post.repostOf && typeof post.repostOf === 'object') {
+            extracted.push(post.repostOf);
+        }
+        return extracted;
+    });
 
 const Feed = () => {
+    const [activeSection, setActiveSection] = useState('friends');
     const queryClient = useQueryClient();
     const { posts: allPosts, mergePosts } = useFeed();
 
@@ -24,99 +41,92 @@ const Feed = () => {
         isLoading,
         error: queryError
     } = useInfiniteQuery({
-        queryKey: ['feed'],
-        queryFn: ({ pageParam }) => postsService.getFeed(pageParam),
+        queryKey: ['feed', activeSection],
+        queryFn: ({ pageParam }) => postsService.getFeed({
+            section: activeSection,
+            cursor: pageParam,
+            limit: 10
+        }),
         getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
-        staleTime: 1000 * 60 * 5, // 5 minutes
+        staleTime: 1000 * 60 * 5,
+        initialPageParam: null
     });
 
-    // 1. Sync fetched posts to FeedContext (for interactions)
+    const pages = data?.pages ?? EMPTY_PAGES;
+
     useEffect(() => {
-        if (data?.pages) {
-            const newPosts = data.pages.flatMap(page => page.posts);
-            mergePosts(newPosts);
-        }
-    }, [data?.pages, mergePosts]);
+        if (!pages.length) return;
+        mergePosts(extractPostsForContext(pages));
+    }, [mergePosts, pages]);
 
-    // 2. Derive visible posts merging Cache Order + Context Updates
-    const visiblePosts = useMemo(() => {
-        if (!data?.pages) return [];
-        return data.pages.flatMap(page =>
-            page.posts.map(p => allPosts[p._id] || p) // Prefer context version (has likes/comments updates)
-        );
-    }, [data?.pages, allPosts]);
+    const visiblePosts = pages.flatMap((page) =>
+        page.posts.map((post) => allPosts[post._id] || post)
+    );
 
-
-
-    // Listener for Background Uploads
     useEffect(() => {
         const handleNewPost = (event) => {
             const newPost = event.detail;
-            handlePostCreated(newPost);
+            const user = JSON.parse(localStorage.getItem('user') || 'null');
+            if (!user) return;
 
-            // Scroll to top smoothly
+            const postWithAuthor = {
+                ...newPost,
+                author: {
+                    _id: user._id || user.id,
+                    fullname: user.fullname,
+                    username: user.username,
+                    avatar: user.avatar,
+                    isPrivate: false
+                },
+                liked: false,
+                reposted: false,
+                saved: false,
+                isRepost: !!newPost.repostOf,
+                originalPost: newPost.repostOf || null
+            };
+
+            mergePosts([postWithAuthor]);
+
+            ['friends', 'recents'].forEach((section) => {
+                queryClient.setQueryData(['feed', section], (oldData) => {
+                    if (!oldData?.pages?.length) {
+                        return {
+                            pages: [{ posts: [postWithAuthor], nextCursor: null }],
+                            pageParams: [null]
+                        };
+                    }
+
+                    const newPages = [...oldData.pages];
+                    newPages[0] = {
+                        ...newPages[0],
+                        posts: [postWithAuthor, ...newPages[0].posts.filter((post) => post._id !== postWithAuthor._id)]
+                    };
+
+                    return { ...oldData, pages: newPages };
+                });
+            });
+
             window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
         window.addEventListener('post-created', handleNewPost);
         return () => window.removeEventListener('post-created', handleNewPost);
-    }, [mergePosts]); // Added mergePosts dep
-
-    const handlePostCreated = (newPost) => {
-        const user = JSON.parse(localStorage.getItem('user'));
-        const postWithAuthor = {
-            ...newPost,
-            author: {
-                _id: user._id || user.id,
-                fullname: user.fullname,
-                username: user.username,
-                avatar: user.avatar
-            },
-            // Default interactive state
-            likeCount: 0,
-            commentCount: 0,
-            repostCount: 0,
-            liked: false,
-            reposted: false,
-            saved: false
-        };
-
-        // Merge to Context (for immediate availability)
-        mergePosts([postWithAuthor]);
-
-        // Update Cache (prepend to first page)
-        queryClient.setQueryData(['feed'], (oldData) => {
-            if (!oldData) return { pages: [{ posts: [postWithAuthor] }], pageParams: [undefined] };
-
-            const newPages = [...oldData.pages];
-            // Setup a new first page or prepend to existing
-            if (newPages.length > 0) {
-                newPages[0] = {
-                    ...newPages[0],
-                    posts: [postWithAuthor, ...newPages[0].posts],
-                };
-            }
-            return { ...oldData, pages: newPages };
-        });
-
-        // No need to setPostIds manually anymore
-    };
+    }, [mergePosts, queryClient]);
 
     const handleDeletePost = (deletedPostId) => {
-        // Update Cache to remove post
-        queryClient.setQueryData(['feed'], (oldData) => {
-            if (!oldData) return oldData;
-            return {
-                ...oldData,
-                pages: oldData.pages.map(page => ({
-                    ...page,
-                    posts: page.posts.filter(p => p._id !== deletedPostId)
-                }))
-            };
+        FEED_SECTIONS.forEach(({ id }) => {
+            queryClient.setQueryData(['feed', id], (oldData) => {
+                if (!oldData) return oldData;
+                return {
+                    ...oldData,
+                    pages: oldData.pages.map((page) => ({
+                        ...page,
+                        posts: page.posts.filter((post) => post._id !== deletedPostId)
+                    }))
+                };
+            });
         });
-        toast.success("Post deleted");
     };
-
 
     return (
         <div className="feed-layout">
@@ -124,22 +134,29 @@ const Feed = () => {
 
             <main className="feed-center">
                 <div className="feed-center-content">
-                    {/* 1. Feed Header Unified */}
                     <div className="feed-header-unified">
                         <h1>Feeds</h1>
                         <div className="header-filters">
-                            <button className="text-filter">Recents</button>
-                            <button className="text-filter active">Friends</button>
-                            <button className="text-filter">Popular</button>
+                            {FEED_SECTIONS.map((section) => (
+                                <button
+                                    key={section.id}
+                                    className={`text-filter ${activeSection === section.id ? 'active' : ''}`}
+                                    onClick={() => setActiveSection(section.id)}
+                                >
+                                    {section.label}
+                                </button>
+                            ))}
                         </div>
                     </div>
 
-                    {/* 3. Post List */}
                     <div className="feed-list">
                         {queryError && (
                             <div className="feed-error-state">
                                 <p>Unable to load posts</p>
-                                <button onClick={() => { queryClient.invalidateQueries(['feed']); }} className="retry-btn">
+                                <button
+                                    onClick={() => queryClient.invalidateQueries({ queryKey: ['feed', activeSection] })}
+                                    className="retry-btn"
+                                >
                                     Retry
                                 </button>
                             </div>
@@ -147,8 +164,8 @@ const Feed = () => {
 
                         {isLoading && visiblePosts.length === 0 && (
                             <>
-                                {[...Array(5)].map((_, i) => (
-                                    <PostSkeleton key={i} />
+                                {[...Array(5)].map((_, index) => (
+                                    <PostSkeleton key={index} />
                                 ))}
                             </>
                         )}
@@ -171,23 +188,25 @@ const Feed = () => {
                                 )}
                                 components={{
                                     Footer: () => (
-                                        isFetchingNextPage && (
+                                        isFetchingNextPage ? (
                                             <div className="feed-loader">
                                                 <LogoLoader size="1.2rem" text="Loading more posts..." />
                                             </div>
-                                        )
+                                        ) : null
                                     )
                                 }}
                             />
                         )}
                     </div>
                 </div>
-            </main >
+            </main>
 
             <RightSidebar />
             <MobileNavbar />
-        </div >
+        </div>
     );
 };
+
 Feed.whyDidYouRender = true;
+
 export default Feed;

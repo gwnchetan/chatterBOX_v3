@@ -1,0 +1,221 @@
+# ChatterBOX v3.1 - Complete Package Manifest
+# This file lists all npm dependencies and versions for the entire project
+# Use this as a reference when setting up on new devices
+# 
+# Installation:
+# - Run: npm run install-all
+# - Or manually: npm install in each subdirectory
+#
+# System Requirements:
+# - Node.js: >= 20.0.0
+# - npm: >= 10.0.0
+# - MongoDB: >= 4.4 (local or Atlas cloud)
+
+========================================
+ROOT DEPENDENCIES (chatterBOXv3.1/)
+========================================
+
+Production Dependencies:
+  concurrently@^8.2.2
+
+========================================
+FRONTEND DEPENDENCIES (chatterbox-client/)
+========================================
+
+Production Dependencies:
+  @ffmpeg/ffmpeg@^0.12.15
+  @ffmpeg/util@^0.12.2
+  @react-oauth/google@^0.13.0
+  @tanstack/react-query@^5.90.20
+  axios@^1.13.2
+  date-fns@^4.1.0
+  emoji-picker-react@^4.16.1
+  jwt-decode@^4.0.0
+  rc-slider@^11.1.9
+  react@^19.2.0
+  react-dom@^19.2.0
+  react-easy-crop@^5.5.6
+  react-intersection-observer@^10.0.2
+  react-player@^3.4.0
+  react-router-dom@^7.10.1
+  react-virtuoso@^4.18.1
+  socket.io-client@^4.8.3
+
+Development Dependencies:
+  @eslint/js@^9.39.1
+  @types/react@^19.2.5
+  @types/react-dom@^19.2.3
+  @vitejs/plugin-react@^5.1.1
+  @welldone-software/why-did-you-render@^10.0.1
+  eslint@^9.39.1
+  eslint-plugin-react-hooks@^7.0.1
+  eslint-plugin-react-refresh@^0.4.24
+  globals@^16.5.0
+  vite@^7.2.4
+
+Node.js Requirement: >=20.0.0
+
+========================================
+BACKEND DEPENDENCIES (chatterbox-server/)
+========================================
+
+Production Dependencies:
+  axios@^1.13.2
+  bcrypt@^6.0.0
+  cloudinary@^2.8.0
+  compression@^1.8.1
+  cors@^2.8.5
+  dotenv@^16.4.5
+  express@^5.2.1
+  google-auth-library@^10.5.0
+  jsonwebtoken@^9.0.3
+  mongoose@^9.0.2
+  nodemailer@^7.0.11
+  socket.io@^4.8.3
+
+Development Dependencies:
+  nodemon@^3.1.11
+
+Node.js Requirement: >=20.0.0
+
+========================================
+INSTALLATION INSTRUCTIONS
+========================================
+
+Option 1 - Automated Installation:
+  npm run install-all
+
+Option 2 - Manual Installation:
+  
+  # Install root dependencies
+  npm install
+  
+  # Install frontend
+  cd chatterbox-client
+  npm install
+  cd ..
+  
+  # Install backend
+  cd chatterbox-server
+  npm install
+  cd ..
+
+========================================
+ENVIRONMENT SETUP
+========================================
+
+Server (.env file required):
+  - MONGO_URI: MongoDB connection string
+  - JWT_SECRET: JWT secret key (set strong value)
+  - PORT: Server port (default: 5000)
+  - NODE_ENV: Environment type (development/production)
+  - CLIENT_URL: Frontend URL for CORS
+  - CLOUDINARY_CLOUD_NAME: Cloudinary credentials
+  - CLOUDINARY_API_KEY: Cloudinary credentials
+  - CLOUDINARY_API_SECRET: Cloudinary credentials
+
+Client (.env.local file required):
+  - VITE_CLOUDINARY_CLOUD_NAME: Cloudinary cloud name
+  - VITE_GOOGLE_CLIENT_ID: Google OAuth client ID
+  - VITE_GIPHY_API_KEY: Giphy API key
+
+See .env.example files for templates
+
+========================================
+RUNNING THE APPLICATION
+========================================
+
+Development:
+  From root directory: npm run dev
+
+Production:
+  Build: npm run build
+  Start: npm start
+
+Frontend only:
+  cd chatterbox-client && npm run dev
+
+Backend only:
+  cd chatterbox-server && npm run dev
+
+========================================
+VERIFY INSTALLATION
+========================================
+
+Check versions:
+  node --version    (Should be >= 20.0.0)
+  npm --version     (Should be >= 10.0.0)
+
+Check dependencies:
+  npm ls              (from root)
+  npm ls --prefix chatterbox-client
+  npm ls --prefix chatterbox-server
+
+Check for vulnerabilities:
+  npm audit
+
+Update outdated packages:
+  npm update
+
+========================================
+SECURITY NOTES
+========================================
+
+Critical Security Steps:
+  1. Create .env files (DO NOT commit to git)
+  2. Use strong JWT_SECRET (min 32 characters)
+  3. Never expose server .env in client code
+  4. Use HTTPS in production
+  5. Validate all user inputs
+  6. Keep packages updated: npm audit fix
+
+Never commit:
+  - .env files
+  - node_modules/
+  - API keys or secrets
+
+========================================
+TROUBLESHOOTING
+========================================
+
+Module not found:
+  rm -rf node_modules package-lock.json
+  npm run install-all
+
+Port already in use:
+  Change PORT in .env or kill existing process
+
+MongoDB connection failed:
+  - Verify MONGO_URI is correct
+  - Check IP whitelisting in MongoDB Atlas
+  - Ensure MongoDB is running
+
+Cannot find modules in /node_modules:
+  npm cache clean --force
+  rm -rf node_modules package-lock.json
+  npm install
+
+CORS errors:
+  - Check CLIENT_URL in server .env
+  - Verify Socket.io origin matches
+
+========================================
+ADDITIONAL RESOURCES
+========================================
+
+Full Setup Guide: See SETUP_GUIDE.md
+Detailed Dependencies: See DEPENDENCIES.md
+Environment Templates: See .env.example files
+
+Node.js Docs: https://nodejs.org/docs/
+npm Docs: https://docs.npmjs.com/
+Express Docs: https://expressjs.com/
+React Docs: https://react.dev/
+MongoDB Docs: https://docs.mongodb.com/
+Socket.io Docs: https://socket.io/docs/
+
+========================================
+Last Updated: March 2024
+Node.js Requirement: >= 20.0.0
+npm Requirement: >= 10.0.0
+========================================

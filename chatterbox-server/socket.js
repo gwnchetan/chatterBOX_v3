@@ -6,77 +6,65 @@ let io;
 const initSocket = (server) => {
     io = socketIo(server, {
         cors: {
-            origin: process.env.CLIENT_URL || "http://localhost:5173",
-            methods: ["GET", "POST"],
+            origin: process.env.CLIENT_URL || 'http://localhost:5173',
+            methods: ['GET', 'POST'],
             credentials: true
         }
     });
 
-    // Auth Middleware
     io.use((socket, next) => {
-        const token = socket.handshake.auth.token || socket.handshake.query.token;
-        if (token) {
-            // Remove 'Bearer ' if present
-            const tokenString = token.startsWith('Bearer ') ? token.slice(7, token.length) : token;
-
-            jwt.verify(tokenString, process.env.JWT_SECRET, (err, decoded) => {
-                if (err) return next(new Error('Authentication error'));
-                socket.user = decoded;
-                next();
-            });
-        } else {
-            next(new Error('Authentication error'));
+        const rawToken = socket.handshake.auth.token || socket.handshake.query.token;
+        if (!rawToken) {
+            return next(new Error('Authentication error'));
         }
+
+        const token = rawToken.startsWith('Bearer ') ? rawToken.slice(7) : rawToken;
+        jwt.verify(token, process.env.JWT_SECRET || 'chatterbox_secret_key_2024', (error, decoded) => {
+            if (error) {
+                return next(new Error('Authentication error'));
+            }
+
+            socket.user = decoded;
+            return next();
+        });
     });
 
     io.on('connection', (socket) => {
-        // console.log(`User connected: ${socket.user?.id}`);
+        const currentUserId = socket.user.id || socket.user._id;
+        if (currentUserId) {
+            socket.join(`user:${currentUserId}`);
+            socket.emit('user:joined', { userId: currentUserId, room: `user:${currentUserId}` });
+        }
 
-        // Join specific post room (post:{postId})
         socket.on('join_post', (postId) => {
             if (postId) {
-                const roomName = `post:${postId}`;
-                socket.join(roomName);
+                socket.join(`post:${postId}`);
             }
         });
 
-        // Join specific user room (user:{userId}) - For notifications
-        socket.on('join_user', (userId) => {
-            // Allow joining only own room for privacy, or allow if logic permits
-            // socket.user is populated from token.
-            // We trust the token user ID.
-            if (userId && (socket.user.id === userId || socket.user._id === userId)) {
-                socket.join(`user:${userId}`);
-            }
-        });
-
-        // Leave specific post room
         socket.on('leave_post', (postId) => {
             if (postId) {
-                const roomName = `post:${postId}`;
-                socket.leave(roomName);
+                socket.leave(`post:${postId}`);
             }
         });
 
-        // Join specific chat room (chat:{conversationId})
+        socket.on('join_user', (userId) => {
+            if (!userId || !currentUserId) return;
+            if (currentUserId.toString() !== userId.toString()) return;
+            socket.join(`user:${userId}`);
+            socket.emit('user:joined', { userId, room: `user:${userId}` });
+        });
+
         socket.on('join_chat', (conversationId) => {
             if (conversationId) {
-                const roomName = `chat:${conversationId}`;
-                socket.join(roomName);
-                // console.log(`User ${socket.user.id} joined chat ${roomName}`);
+                socket.join(`chat:${conversationId}`);
             }
         });
 
-        // Leave specific chat room
         socket.on('leave_chat', (conversationId) => {
             if (conversationId) {
-                const roomName = `chat:${conversationId}`;
-                socket.leave(roomName);
+                socket.leave(`chat:${conversationId}`);
             }
-        });
-
-        socket.on('disconnect', () => {
-            // console.log('User disconnected');
         });
     });
 
@@ -85,8 +73,9 @@ const initSocket = (server) => {
 
 const getIo = () => {
     if (!io) {
-        throw new Error("Socket.io not initialized!");
+        throw new Error('Socket.io not initialized!');
     }
+
     return io;
 };
 

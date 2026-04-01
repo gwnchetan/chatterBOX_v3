@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { socketService } from './socket.service';
 
 const API_URL = import.meta.env.MODE === 'production' ? '/api' : 'http://localhost:5000/api';
 
@@ -35,6 +36,7 @@ api.interceptors.response.use(
         if (error.response?.status === 401) {
             localStorage.removeItem('user');
             localStorage.removeItem('token');
+            socketService.clearAuthSession();
             // Only redirect if not already at login
             if (window.location.pathname !== '/' && !window.location.pathname.includes('/login')) {
                 window.location.href = '/';

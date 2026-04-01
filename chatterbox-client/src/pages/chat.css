@@ -182,6 +182,7 @@
     background-color: var(--color-surface);
     color: var(--color-text-main);
     padding: var(--spacing-xl);
+    z-index: 999;
 }
 
 .empty-state-content {

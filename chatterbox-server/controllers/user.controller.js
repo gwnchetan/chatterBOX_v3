@@ -1,19 +1,61 @@
+const mongoose = require('mongoose');
 const User = require('../models/users');
 const Post = require('../models/posts');
+const Like = require('../models/likes');
 const Notification = require('../models/notifications');
 const { getIo } = require('../socket');
-const mongoose = require('mongoose');
+const { getViewerContext, getBlockState, normalizeId } = require('../utils/privacy');
 
-/**
- * Fetch a user's profile details and stats
- * GET /api/users/:userId
- */
+const POST_AUTHOR_FIELDS = 'username fullname avatar isPrivate';
+
+const buildPostStatuses = async (posts, viewerId, viewerContext) => {
+    if (!viewerId || posts.length === 0) {
+        return posts;
+    }
+
+    const postIds = posts.map((post) => post._id);
+    const [userLikes, userReposts] = await Promise.all([
+        Like.find({ post: { $in: postIds }, user: viewerId }).select('post').lean(),
+        Post.find({ repostOf: { $in: postIds }, author: viewerId }).select('repostOf').lean()
+    ]);
+
+    const likedPostIds = new Set(userLikes.map((like) => normalizeId(like.post)));
+    const repostedPostIds = new Set(userReposts.map((repost) => normalizeId(repost.repostOf)));
+
+    return posts.map((post) => ({
+        ...post,
+        liked: likedPostIds.has(normalizeId(post._id)),
+        reposted: repostedPostIds.has(normalizeId(post._id)),
+        saved: viewerContext.savedPostIds.has(normalizeId(post._id)),
+        isRepost: !!post.repostOf,
+        originalPost: post.repostOf || null
+    }));
+};
+
+const emitFollowStatusUpdate = (targetUserId, currentUserId, status) => {
+    try {
+        getIo().to(`user:${targetUserId}`).emit('user:follow_status_update', {
+            targetUserId: currentUserId,
+            status
+        });
+    } catch (error) {
+        console.error('Socket emit failed', error);
+    }
+};
+
 exports.getUserProfile = async (req, res) => {
     try {
         const { userId } = req.params;
 
         if (!mongoose.Types.ObjectId.isValid(userId)) {
             return res.status(400).json({ message: 'Invalid user ID format' });
+        }
+
+        if (req.user) {
+            const blockState = await getBlockState(req.user._id, userId);
+            if (blockState.blocked) {
+                return res.status(404).json({ message: 'User not found' });
+            }
         }
 
         const user = await User.findById(userId)
@@ -25,24 +67,24 @@ exports.getUserProfile = async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        // Check relationship with current user
         let followStatus = 'none';
         if (req.user) {
             const currentUserId = req.user._id.toString();
-            // Check followers list (assuming we maintain it now) OR checking current user's following list
-            const currentUser = await User.findById(currentUserId).select('following').lean();
-            if (currentUser.following.find(f => f.toString() === userId)) {
+            const currentUser = await User.findById(currentUserId)
+                .select('following')
+                .lean();
+
+            if (currentUser?.following?.some((id) => normalizeId(id) === userId)) {
                 followStatus = 'following';
-            } else if (user.followRequests && user.followRequests.find(id => id.toString() === currentUserId)) {
+            } else if (user.followRequests?.some((id) => normalizeId(id) === currentUserId)) {
                 followStatus = 'requested';
             }
         }
 
-        // Aggregate stats
-        const postCount = await Post.countDocuments({ author: userId, isDeleted: false });
-        // Accurate follower count from DB
-        const followerCount = await User.countDocuments({ following: userId });
-        const followingCount = user.following.length;
+        const [postCount, followerCount] = await Promise.all([
+            Post.countDocuments({ author: userId, isDeleted: false }),
+            User.countDocuments({ following: userId })
+        ]);
 
         res.json({
             user: {
@@ -51,45 +93,44 @@ exports.getUserProfile = async (req, res) => {
                 stats: {
                     posts: postCount,
                     followers: followerCount,
-                    following: followingCount
+                    following: user.following.length
                 }
             }
         });
-
     } catch (error) {
         console.error('Error fetching user profile:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-/**
- * Fetch posts authored by a specific user
- * GET /api/users/:userId/posts
- */
 exports.getUserPosts = async (req, res) => {
     try {
         const { userId: rawUserId } = req.params;
         const userId = rawUserId.trim();
+        const viewerId = req.user?._id;
         const { cursor, limit = 12 } = req.query;
-        // Check current user from request (middleware populates this)
-        const currentUserId = req.user ? req.user._id.toString() : null;
+        const limitNum = parseInt(limit, 10);
 
-        const limitNum = parseInt(limit);
+        const targetUser = await User.findById(userId).select('isPrivate').lean();
+        if (!targetUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
 
-        const targetUser = await User.findById(userId);
-        if (!targetUser) return res.status(404).json({ message: 'User not found' });
-
-        // Privacy Check
-        // If user is private AND requester is not the user themselves
-        if (targetUser.isPrivate && (!currentUserId || userId !== currentUserId)) {
-            // Check if current user follows targetUser
-            const currentUser = await User.findById(currentUserId);
-            const isFollowing = currentUser && currentUser.following.some(id => id.toString() === userId);
-
-            if (!isFollowing) {
-                console.log(`Access Denied: User ${currentUserId} tried to access private posts of ${userId}`);
-                return res.status(403).json({ message: 'This account is private', isPrivate: true });
+        let viewerContext = null;
+        if (viewerId) {
+            const blockState = await getBlockState(viewerId, userId);
+            if (blockState.blocked) {
+                return res.status(404).json({ message: 'User not found' });
             }
+            viewerContext = await getViewerContext(viewerId);
+        }
+
+        const canViewPrivatePosts = !targetUser.isPrivate
+            || normalizeId(viewerId) === userId
+            || viewerContext?.followingIds.has(userId);
+
+        if (!canViewPrivatePosts) {
+            return res.status(403).json({ message: 'This account is private', isPrivate: true });
         }
 
         const query = {
@@ -97,7 +138,6 @@ exports.getUserPosts = async (req, res) => {
             isDeleted: false
         };
 
-        // Handle cursor pagination
         if (cursor) {
             const [date, id] = cursor.split('_');
             query.$or = [
@@ -109,11 +149,23 @@ exports.getUserPosts = async (req, res) => {
             ];
         }
 
-        const posts = await Post.find(query)
+        const rawPosts = await Post.find(query)
             .sort({ createdAt: -1, _id: -1 })
-            .limit(limitNum)
-            .populate('author', 'username fullname avatar')
+            .limit(limitNum + 5)
+            .populate('author', POST_AUTHOR_FIELDS)
+            .populate({
+                path: 'repostOf',
+                populate: { path: 'author', select: POST_AUTHOR_FIELDS }
+            })
             .lean();
+
+        const visiblePosts = viewerContext
+            ? rawPosts.filter((post) => viewerContext.canSeePost(post)).slice(0, limitNum)
+            : rawPosts.slice(0, limitNum);
+
+        const posts = viewerContext
+            ? await buildPostStatuses(visiblePosts, viewerId, viewerContext)
+            : visiblePosts;
 
         let nextCursor = null;
         if (posts.length === limitNum) {
@@ -121,24 +173,16 @@ exports.getUserPosts = async (req, res) => {
             nextCursor = `${lastPost.createdAt.toISOString()}_${lastPost._id}`;
         }
 
-        res.json({
-            posts,
-            nextCursor
-        });
-
+        res.json({ posts, nextCursor });
     } catch (error) {
         console.error('Error fetching user posts:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-/**
- * Update user profile details
- * PATCH /api/users/profile
- */
 exports.updateProfile = async (req, res) => {
     try {
-        const userId = req.user.id; // From authMiddleware
+        const userId = req.user.id;
         const { fullname, bio, location, website, avatar, bannerImage } = req.body;
 
         const updateFields = {};
@@ -164,90 +208,81 @@ exports.updateProfile = async (req, res) => {
             message: 'Profile updated successfully',
             user: updatedUser
         });
-
     } catch (error) {
         console.error('Error updating profile:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-/**
- * Follow a user
- * POST /api/users/:userId/follow
- */
 exports.followUser = async (req, res) => {
     try {
-        let { userId } = req.params; // Target user
-        userId = userId.trim();
+        const targetUserId = req.params.userId.trim();
         const currentUserId = req.user._id.toString();
 
-        if (userId === currentUserId) {
-            return res.status(400).json({ message: "You cannot follow yourself" });
+        if (targetUserId === currentUserId) {
+            return res.status(400).json({ message: 'You cannot follow yourself' });
         }
 
-        const targetUser = await User.findById(userId);
-        if (!targetUser) return res.status(404).json({ message: "User not found" });
+        const [targetUser, currentUser] = await Promise.all([
+            User.findById(targetUserId).select('isPrivate followRequests blockedUsers').lean(),
+            User.findById(currentUserId).select('following blockedUsers').lean()
+        ]);
 
-        // Check if already following
-        // Using countDocuments is faster than retrieving the array
-        const currentUser = await User.findById(currentUserId);
-        if (currentUser.following.includes(userId)) {
-            return res.status(400).json({ message: "Already following", status: 'following' });
+        if (!targetUser) {
+            return res.status(404).json({ message: 'User not found' });
         }
 
-        // ... (at followUser)
-        // 1. Private Account Logic
+        const blockState = await getBlockState(currentUserId, targetUserId);
+        if (blockState.blocked) {
+            return res.status(403).json({ message: 'This user is unavailable.' });
+        }
+
+        if (currentUser.following.some((id) => normalizeId(id) === targetUserId)) {
+            return res.status(400).json({ message: 'Already following', status: 'following' });
+        }
+
         if (targetUser.isPrivate) {
-            if (targetUser.followRequests && targetUser.followRequests.includes(currentUserId)) {
-                return res.json({ message: "Request already sent", status: 'requested' });
+            if (targetUser.followRequests?.some((id) => normalizeId(id) === currentUserId)) {
+                return res.json({ message: 'Request already sent', status: 'requested' });
             }
 
-            // Send Request
-            await User.findByIdAndUpdate(userId, {
+            await User.findByIdAndUpdate(targetUserId, {
                 $addToSet: { followRequests: currentUserId }
             });
 
-            // Notification (Prevent Duplicate)
             const existingNotif = await Notification.findOne({
-                recipient: userId,
+                recipient: targetUserId,
                 sender: currentUserId,
                 type: 'request',
                 read: false
             });
 
             if (existingNotif) {
-                // Just update timestamp
                 existingNotif.createdAt = new Date();
                 await existingNotif.save();
-                // Re-emit for real-time bump
-                try {
-                    getIo().to(`user:${userId}`).emit('notification:new', existingNotif);
-                } catch (e) { console.error("Socket emit fail", e); }
+                await existingNotif.populate('sender', 'username fullname avatar');
+                getIo().to(`user:${targetUserId}`).emit('notification:new', existingNotif);
             } else {
                 const notif = new Notification({
-                    recipient: userId,
+                    recipient: targetUserId,
                     sender: currentUserId,
                     type: 'request'
                 });
                 await notif.save();
                 await notif.populate('sender', 'username fullname avatar');
-                try {
-                    getIo().to(`user:${userId}`).emit('notification:new', notif);
-                } catch (e) { console.error("Socket emit fail", e); }
+                getIo().to(`user:${targetUserId}`).emit('notification:new', notif);
             }
 
-            return res.json({ message: "Follow request sent", status: 'requested' });
+            return res.json({ message: 'Follow request sent', status: 'requested' });
         }
 
-        // 2. Public Account Logic
         await Promise.all([
-            User.findByIdAndUpdate(currentUserId, { $addToSet: { following: userId } }),
-            User.findByIdAndUpdate(userId, { $addToSet: { followers: currentUserId } })
+            User.findByIdAndUpdate(currentUserId, { $addToSet: { following: targetUserId } }),
+            User.findByIdAndUpdate(targetUserId, { $addToSet: { followers: currentUserId } })
         ]);
 
-        // Notification (Prevent Duplicate)
         const existingNotif = await Notification.findOne({
-            recipient: userId,
+            recipient: targetUserId,
             sender: currentUserId,
             type: 'follow',
             read: false
@@ -256,122 +291,106 @@ exports.followUser = async (req, res) => {
         if (existingNotif) {
             existingNotif.createdAt = new Date();
             await existingNotif.save();
-            try {
-                getIo().to(`user:${userId}`).emit('notification:new', existingNotif);
-            } catch (e) { console.error("Socket emit fail", e); }
+            await existingNotif.populate('sender', 'username fullname avatar');
+            getIo().to(`user:${targetUserId}`).emit('notification:new', existingNotif);
         } else {
             const notif = new Notification({
-                recipient: userId,
+                recipient: targetUserId,
                 sender: currentUserId,
                 type: 'follow'
             });
             await notif.save();
             await notif.populate('sender', 'username fullname avatar');
-            try {
-                getIo().to(`user:${userId}`).emit('notification:new', notif);
-            } catch (e) { console.error("Socket emit fail", e); }
+            getIo().to(`user:${targetUserId}`).emit('notification:new', notif);
         }
 
-        res.json({ message: "Followed successfully", status: 'following' });
+        res.json({ message: 'Followed successfully', status: 'following' });
     } catch (error) {
-        console.error("Error following user:", error);
-        res.status(500).json({ message: "Internal server error" });
+        console.error('Error following user:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-/**
- * Unfollow a user
- * POST /api/users/:userId/unfollow
- */
 exports.unfollowUser = async (req, res) => {
     try {
-        const { userId } = req.params;
+        const targetUserId = req.params.userId;
         const currentUserId = req.user._id;
 
         await Promise.all([
-            User.findByIdAndUpdate(currentUserId, { $pull: { following: userId } }),
-            User.findByIdAndUpdate(userId, {
+            User.findByIdAndUpdate(currentUserId, {
+                $pull: { following: targetUserId }
+            }),
+            User.findByIdAndUpdate(targetUserId, {
                 $pull: { followers: currentUserId, followRequests: currentUserId }
             })
         ]);
 
-        // Optional: Remove relevant notifications if you want to be super clean
-        // await Notification.deleteMany({ sender: currentUserId, recipient: userId, type: { $in: ['follow', 'request'] } });
+        await Notification.deleteMany({
+            recipient: targetUserId,
+            sender: currentUserId,
+            type: { $in: ['follow', 'request'] }
+        });
 
-        res.json({ message: "Unfollowed successfully", status: 'none' });
+        emitFollowStatusUpdate(targetUserId, currentUserId, 'none');
+
+        res.json({ message: 'Unfollowed successfully', status: 'none' });
     } catch (error) {
-        console.error("Error unfollowing user:", error);
-        res.status(500).json({ message: "Internal server error" });
+        console.error('Error unfollowing user:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-/**
- * Accept follow request
- * POST /api/users/:userId/accept
- * Note: userId here is the REQUESTER (the person who wants to follow me)
- */
 exports.acceptFollowRequest = async (req, res) => {
     try {
         const requesterId = req.params.userId;
         const currentUserId = req.user._id;
 
-        // Verify request exists
-        const currentUser = await User.findById(currentUserId);
-        if (!currentUser.followRequests.includes(requesterId)) {
-            return res.status(404).json({ message: "Request not found" });
+        const blockState = await getBlockState(currentUserId, requesterId);
+        if (blockState.blocked) {
+            return res.status(403).json({ message: 'This user is unavailable.' });
+        }
+
+        const currentUser = await User.findById(currentUserId).select('followRequests').lean();
+        if (!currentUser?.followRequests?.some((id) => normalizeId(id) === requesterId)) {
+            return res.status(404).json({ message: 'Request not found' });
         }
 
         await Promise.all([
-            // Add to followers of current user
             User.findByIdAndUpdate(currentUserId, {
                 $addToSet: { followers: requesterId },
                 $pull: { followRequests: requesterId }
             }),
-            // Add to following of requester
             User.findByIdAndUpdate(requesterId, {
                 $addToSet: { following: currentUserId }
             })
         ]);
 
-        // Clean up the request notification
         await Notification.deleteMany({
             recipient: currentUserId,
             sender: requesterId,
             type: 'request'
         });
 
-        // Send Notification to Requester (Accepted)
         const notif = new Notification({
             recipient: requesterId,
             sender: currentUserId,
-            type: 'follow', // Or a new type 'accepted'
+            type: 'follow',
             text: 'accepted your follow request'
         });
+
         await notif.save();
         await notif.populate('sender', 'username fullname avatar');
 
-        try {
-            getIo().to(`user:${requesterId}`).emit('notification:new', notif);
+        getIo().to(`user:${requesterId}`).emit('notification:new', notif);
+        emitFollowStatusUpdate(requesterId, currentUserId, 'following');
 
-            // Emit special event for real-time status update on their profile page
-            getIo().to(`user:${requesterId}`).emit('user:follow_status_update', {
-                targetUserId: currentUserId,
-                status: 'following'
-            });
-        } catch (e) { console.error(e) }
-
-        res.json({ message: "Request accepted" });
-
+        res.json({ message: 'Request accepted' });
     } catch (error) {
-        console.error("Error accepting request:", error);
-        res.status(500).json({ message: "Internal server error" });
+        console.error('Error accepting request:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-/**
- * Reject follow request
- * POST /api/users/:userId/reject
- */
 exports.rejectFollowRequest = async (req, res) => {
     try {
         const requesterId = req.params.userId;
@@ -381,48 +400,44 @@ exports.rejectFollowRequest = async (req, res) => {
             $pull: { followRequests: requesterId }
         });
 
-        // Clean up the request notification
         await Notification.deleteMany({
             recipient: currentUserId,
             sender: requesterId,
             type: 'request'
         });
 
-        // Emit special event for real-time status update (back to none/follow)
-        try {
-            getIo().to(`user:${requesterId}`).emit('user:follow_status_update', {
-                targetUserId: currentUserId,
-                status: 'none'
-            });
-        } catch (e) { console.error(e) }
+        emitFollowStatusUpdate(requesterId, currentUserId, 'none');
 
-        res.json({ message: "Request rejected" });
+        res.json({ message: 'Request rejected' });
     } catch (error) {
-        console.error("Error rejecting request:", error);
-        res.status(500).json({ message: "Internal server error" });
+        console.error('Error rejecting request:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-/**
- * Search users
- * GET /api/users/search?q=query
- */
 exports.searchUsers = async (req, res) => {
     try {
         const { q } = req.query;
-        if (!q) return res.json({ users: [] });
+        if (!q) {
+            return res.json({ users: [] });
+        }
 
+        const viewerContext = await getViewerContext(req.user._id);
         const users = await User.find({
+            _id: { $nin: Array.from(viewerContext.hiddenUserIds) },
             $or: [
                 { username: { $regex: q, $options: 'i' } },
                 { fullname: { $regex: q, $options: 'i' } }
             ]
-        }).select('username fullname avatar bio').limit(10);
+        })
+            .select('username fullname avatar bio isPrivate')
+            .limit(10)
+            .lean();
 
         res.json({ users });
     } catch (error) {
-        console.error("Error searching users:", error);
-        res.status(500).json({ message: "Internal server error" });
+        console.error('Error searching users:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 
@@ -435,10 +450,10 @@ exports.savePost = async (req, res) => {
             $addToSet: { savedPosts: postId }
         });
 
-        res.json({ message: "Post saved" });
+        res.json({ message: 'Post saved' });
     } catch (error) {
-        console.error("Error saving post:", error);
-        res.status(500).json({ message: "Internal server error" });
+        console.error('Error saving post:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 
@@ -451,46 +466,135 @@ exports.unsavePost = async (req, res) => {
             $pull: { savedPosts: postId }
         });
 
-        res.json({ message: "Post unsaved" });
+        res.json({ message: 'Post unsaved' });
     } catch (error) {
-        console.error("Error unsaving post:", error);
-        res.status(500).json({ message: "Internal server error" });
+        console.error('Error unsaving post:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 
 exports.getSavedPosts = async (req, res) => {
     try {
         const userId = req.user._id;
+        const viewerContext = await getViewerContext(userId);
 
-        const user = await User.findById(userId).populate({
-            path: 'savedPosts',
-            populate: { path: 'author', select: 'username fullname avatar' }
-        }).lean();
+        const user = await User.findById(userId)
+            .populate({
+                path: 'savedPosts',
+                match: { isDeleted: false },
+                populate: [
+                    { path: 'author', select: POST_AUTHOR_FIELDS },
+                    {
+                        path: 'repostOf',
+                        populate: { path: 'author', select: POST_AUTHOR_FIELDS }
+                    }
+                ]
+            })
+            .lean();
 
-        // Filter out null/deleted posts
-        const posts = user.savedPosts.filter(p => p && !p.isDeleted).reverse();
+        const rawPosts = (user?.savedPosts || []).filter(Boolean);
+        const visiblePosts = rawPosts.filter((post) => viewerContext.canSeePost(post));
+        const posts = await buildPostStatuses(visiblePosts, userId, viewerContext);
 
-        res.json({ posts });
+        res.json({ posts: posts.reverse() });
     } catch (error) {
-        console.error("Error fetching saved posts:", error);
-        res.status(500).json({ message: "Internal server error" });
+        console.error('Error fetching saved posts:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
 
-/**
- * Get users the current user is following
- * GET /api/users/following
- */
 exports.getFollowing = async (req, res) => {
     try {
         const userId = req.user._id;
-        const user = await User.findById(userId).populate('following', 'username fullname avatar isPrivate').lean();
+        const viewerContext = await getViewerContext(userId);
+        const user = await User.findById(userId)
+            .populate('following', 'username fullname avatar isPrivate')
+            .lean();
 
-        if (!user) return res.status(404).json({ message: "User not found" });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
 
-        res.json({ following: user.following || [] });
+        const following = (user.following || []).filter((followedUser) => !viewerContext.isHiddenUser(followedUser._id));
+        res.json({ following });
     } catch (error) {
-        console.error("Error fetching following:", error);
-        res.status(500).json({ message: "Server Error" });
+        console.error('Error fetching following:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+exports.blockUser = async (req, res) => {
+    try {
+        const currentUserId = req.user._id.toString();
+        const targetUserId = req.params.userId.trim();
+
+        if (currentUserId === targetUserId) {
+            return res.status(400).json({ message: 'You cannot block yourself' });
+        }
+
+        const targetUser = await User.findById(targetUserId).select('_id').lean();
+        if (!targetUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        await Promise.all([
+            User.findByIdAndUpdate(currentUserId, {
+                $addToSet: { blockedUsers: targetUserId },
+                $pull: { following: targetUserId, followers: targetUserId, followRequests: targetUserId }
+            }),
+            User.findByIdAndUpdate(targetUserId, {
+                $pull: { following: currentUserId, followers: currentUserId, followRequests: currentUserId }
+            })
+        ]);
+
+        await Notification.deleteMany({
+            $or: [
+                { sender: currentUserId, recipient: targetUserId },
+                { sender: targetUserId, recipient: currentUserId }
+            ]
+        });
+
+        emitFollowStatusUpdate(targetUserId, currentUserId, 'blocked');
+        emitFollowStatusUpdate(currentUserId, targetUserId, 'blocked');
+
+        res.json({ message: 'User blocked successfully' });
+    } catch (error) {
+        console.error('Error blocking user:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+exports.unblockUser = async (req, res) => {
+    try {
+        const currentUserId = req.user._id.toString();
+        const targetUserId = req.params.userId.trim();
+
+        await User.findByIdAndUpdate(currentUserId, {
+            $pull: { blockedUsers: targetUserId }
+        });
+
+        emitFollowStatusUpdate(targetUserId, currentUserId, 'none');
+
+        res.json({ message: 'User unblocked successfully' });
+    } catch (error) {
+        console.error('Error unblocking user:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+exports.getBlockedUsers = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id)
+            .populate('blockedUsers', 'username fullname avatar')
+            .lean();
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.json({ blockedUsers: user.blockedUsers || [] });
+    } catch (error) {
+        console.error('Error fetching blocked users:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };

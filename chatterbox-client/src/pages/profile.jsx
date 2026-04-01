@@ -54,6 +54,13 @@ const Profile = () => {
         staleTime: 1000 * 60 * 5, // 5 minutes fresh
     });
 
+    const { data: blockedUsersData } = useQuery({
+        queryKey: ['blocked-users'],
+        queryFn: userService.getBlockedUsers,
+        enabled: !!currentUserId && !isOwner,
+        staleTime: 1000 * 60
+    });
+
     // 3. Fetch Posts Data (Caching enabled)
     const { data: postsData } = useQuery({
         queryKey: ['posts', targetUserId],
@@ -67,18 +74,22 @@ const Profile = () => {
 
     // Sync posts to FeedContext (optional)
     useEffect(() => {
-        if (posts.length > 0) mergePosts(posts);
-    }, [posts, mergePosts]);
+        if (postsData?.posts?.length > 0) {
+            mergePosts(postsData.posts);
+        }
+    }, [mergePosts, postsData?.posts]);
 
     const [viewMode, setViewMode] = useState('list');
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [selectedPost, setSelectedPost] = useState(null);
     const [followLoading, setFollowLoading] = useState(false);
+    const [blockLoading, setBlockLoading] = useState(false);
 
     // Derived State for UI
     const isFollowing = profile?.followStatus === 'following';
     const isRequested = profile?.followStatus === 'requested';
+    const isBlocked = blockedUsersData?.blockedUsers?.some((user) => String(user._id) === String(targetUserId));
 
     const handleFollowToggle = async () => {
         if (!profile) return;
@@ -110,7 +121,7 @@ const Profile = () => {
                 if (response.status === 'requested') toast.success("Request sent");
                 else toast.success(`Followed ${profile.fullname}`);
             }
-            queryClient.invalidateQueries(['profile', targetUserId]); // Re-fetch to ensure consistency
+            queryClient.invalidateQueries({ queryKey: ['profile', targetUserId] }); // Re-fetch to ensure consistency
         } catch (error) {
             queryClient.setQueryData(['profile', targetUserId], previousProfile); // Rollback
             console.error("Follow action failed", error);
@@ -130,13 +141,36 @@ const Profile = () => {
         }
     };
 
+    const handleBlockToggle = async () => {
+        if (blockLoading) return;
+        setBlockLoading(true);
+
+        try {
+            if (isBlocked) {
+                await userService.unblockUser(targetUserId);
+                queryClient.invalidateQueries({ queryKey: ['blocked-users'] });
+                toast.success('User unblocked');
+            } else {
+                await userService.blockUser(targetUserId);
+                queryClient.invalidateQueries({ queryKey: ['blocked-users'] });
+                toast.success('User blocked');
+                navigate('/feed');
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to update block status');
+        } finally {
+            setBlockLoading(false);
+        }
+    };
+
 
     // Real-time follow status update
     // Real-time follow status update
     useEffect(() => {
         const handleStatusUpdate = (data) => {
             if (data.targetUserId === targetUserId) {
-                queryClient.invalidateQueries(['profile', targetUserId]);
+                queryClient.invalidateQueries({ queryKey: ['profile', targetUserId] });
             }
         };
 
@@ -230,17 +264,26 @@ const Profile = () => {
                                                     color: (isFollowing || isRequested) ? 'var(--color-text-main)' : '#fff'
                                                 }}
                                                 onClick={handleFollowToggle}
-                                                disabled={followLoading}
+                                                disabled={followLoading || isBlocked}
                                             >
-                                                <span>{isFollowing ? 'Unfollow' : (isRequested ? 'Requested' : 'Follow')}</span>
+                                                <span>{isBlocked ? 'Blocked' : (isFollowing ? 'Unfollow' : (isRequested ? 'Requested' : 'Follow'))}</span>
                                             </button>
                                             <button
                                                 className="btn-edit-profile"
                                                 style={{ color: 'var(--color-text-main)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', marginLeft: '8px' }}
                                                 onClick={handleMessage}
+                                                disabled={isBlocked}
                                             >
                                                 <MessageSquare size={18} />
                                                 <span>Message</span>
+                                            </button>
+                                            <button
+                                                className="btn-edit-profile"
+                                                style={{ color: 'var(--color-text-main)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', marginLeft: '8px' }}
+                                                onClick={handleBlockToggle}
+                                                disabled={blockLoading}
+                                            >
+                                                <span>{isBlocked ? 'Unblock' : 'Block'}</span>
                                             </button>
                                         </>
                                     )}
@@ -337,9 +380,16 @@ const Profile = () => {
                                             return (
                                                 <div key={post._id} className="feed-item-wrapper">
                                                     {hasMedia ? (
-                                                        <PostCard post={post} onDelete={(deletedId) => setPosts(prev => prev.filter(p => p._id !== deletedId))} />
+                                                        <PostCard
+                                                            post={post}
+                                                            onDelete={() => queryClient.invalidateQueries({ queryKey: ['posts', targetUserId] })}
+                                                        />
                                                     ) : (
-                                                        <ProfilePostCard post={post} isOwner={isOwner} onDelete={(deletedId) => setPosts(prev => prev.filter(p => p._id !== deletedId))} />
+                                                        <ProfilePostCard
+                                                            post={post}
+                                                            isOwner={isOwner}
+                                                            onDelete={() => queryClient.invalidateQueries({ queryKey: ['posts', targetUserId] })}
+                                                        />
                                                     )}
                                                 </div>
                                             );

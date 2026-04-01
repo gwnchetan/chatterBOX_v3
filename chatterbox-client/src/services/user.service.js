@@ -14,6 +14,11 @@ const userService = {
         return response.data;
     },
 
+    getBlockedUsers: async () => {
+        const response = await api.get('/users/blocked');
+        return response.data;
+    },
+
     /**
      * Fetch all posts by a specific user
      */
@@ -56,6 +61,16 @@ const userService = {
 
     rejectFollowRequest: async (userId) => {
         const response = await api.post(`/users/${userId}/reject`);
+        return response.data;
+    },
+
+    blockUser: async (userId) => {
+        const response = await api.post(`/users/${userId}/block`);
+        return response.data;
+    },
+
+    unblockUser: async (userId) => {
+        const response = await api.post(`/users/${userId}/unblock`);
         return response.data;
     },
 

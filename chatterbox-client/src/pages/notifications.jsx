@@ -1,36 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Navbar from '../components/layout/Navbar';
 import MobileNavbar from '../components/layout/MobileNavbar';
 import NotificationItem from '../components/notifications/NotificationItem';
 import { notificationService } from '../services/notification.service';
 import { Bell } from '../components/common/Icons';
 import RightSidebar from '../components/layout/RightSidebar';
-import './feed.css'; // For layout structure
+import './feed.css';
 import './notifications.css';
 
 const NotificationsPage = () => {
-    const [notifications, setNotifications] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const loadNotifications = async () => {
-            try {
-                const data = await notificationService.getNotifications();
-                setNotifications(data);
-            } catch (error) {
-                console.error("Failed to load notifications", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadNotifications();
-    }, []);
+    const queryClient = useQueryClient();
+    const { data: notifications = [], isLoading } = useQuery({
+        queryKey: ['notifications'],
+        queryFn: notificationService.getNotifications,
+        staleTime: 1000 * 30
+    });
 
     const markAllRead = async () => {
         try {
             await notificationService.markAsRead();
-            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-        } catch (error) { console.error(error); }
+            queryClient.setQueryData(['notifications'], (currentNotifications = []) =>
+                currentNotifications.map((notification) => ({ ...notification, read: true }))
+            );
+        } catch (error) {
+            console.error(error);
+        }
     };
 
     return (
@@ -47,22 +42,19 @@ const NotificationsPage = () => {
                     </div>
 
                     <div className="notifications-list-full">
-                        {loading ? (
+                        {isLoading ? (
                             <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-secondary)' }}>Loading...</div>
                         ) : notifications.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-secondary)' }}>No notifications</div>
                         ) : (
-                            notifications.map(n => (
-                                <NotificationItem key={n._id} notification={n} />
+                            notifications.map((notification) => (
+                                <NotificationItem key={notification._id} notification={notification} />
                             ))
                         )}
                     </div>
                 </div>
             </main>
 
-            {/* Right Sidebar hidden on mobile, visible on desktop. 
-                On desktop, this page might seem redundant if RightSidebar is there. 
-                But for responsiveness, we render it. */}
             <RightSidebar />
             <MobileNavbar />
         </div>

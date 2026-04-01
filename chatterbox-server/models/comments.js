@@ -14,6 +14,15 @@ const commentSchema = new mongoose.Schema({
     content: {
         type: String,
         required: true
+    },
+    parentComment: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Comment',
+        default: null
+    },
+    likeCount: {
+        type: Number,
+        default: 0
     }
 }, {
     timestamps: true
@@ -21,5 +30,6 @@ const commentSchema = new mongoose.Schema({
 
 // Index for fetching comments of a post, sorted by time
 commentSchema.index({ post: 1, createdAt: 1 });
+commentSchema.index({ post: 1, parentComment: 1, createdAt: 1 });
 
 module.exports = mongoose.model('Comment', commentSchema);

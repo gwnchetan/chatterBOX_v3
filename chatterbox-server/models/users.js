@@ -20,7 +20,17 @@ const userSchema = new mongoose.Schema({
     savedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }], // Saved posts
     blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     followRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Pending follow requests
-    isPrivate: { type: Boolean, default: false }
+    isPrivate: { type: Boolean, default: false },
+    stories: [
+        {
+            _id: { type: mongoose.Schema.Types.ObjectId, default: () => new mongoose.Types.ObjectId() },
+            mediaUrl: { type: String, required: true },
+            mediaType: { type: String, enum: ['image', 'video'], default: 'image' },
+            caption: { type: String, default: '' },
+            views: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+            createdAt: { type: Date, default: Date.now }
+        }
+    ]
 });
 
 // Indexes

@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Virtuoso } from 'react-virtuoso';
 import Navbar from '../components/layout/Navbar';
 import RightSidebar from '../components/layout/RightSidebar';
 import PostCard from '../components/feed/PostCard';
 import MobileNavbar from '../components/layout/MobileNavbar';
+import StoryRail from '../components/feed/StoryRail';
 import PostSkeleton from '../components/feed/PostSkeleton';
 import LogoLoader from '../components/common/LogoLoader';
+import Avatar from '../components/common/Avatar';
+import BrandLogo from '../components/common/BrandLogo';
+import { Bell } from '../components/common/Icons';
 import { postsService } from '../services/posts.service';
 import { useFeed } from '../context/FeedContext';
 import './feed.css';
@@ -29,9 +34,12 @@ const extractPostsForContext = (pages = []) => pages
     });
 
 const Feed = () => {
+    const navigate = useNavigate();
     const [activeSection, setActiveSection] = useState('friends');
     const queryClient = useQueryClient();
     const { posts: allPosts, mergePosts } = useFeed();
+    const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+    const currentUserId = currentUser?._id || currentUser?.id || '';
 
     const {
         data,
@@ -134,6 +142,37 @@ const Feed = () => {
 
             <main className="feed-center">
                 <div className="feed-center-content">
+                    <div className="feed-adaptive-topbar">
+                        <button
+                            type="button"
+                            className="feed-adaptive-brand"
+                            onClick={() => navigate('/feed')}
+                            aria-label="Go to feed"
+                        >
+                            <BrandLogo size="1.85rem" animated={false} />
+                        </button>
+                        <div className="feed-adaptive-actions">
+                            <button
+                                type="button"
+                                className="feed-adaptive-icon"
+                                onClick={() => navigate('/notifications')}
+                                aria-label="Open notifications"
+                            >
+                                <Bell size={20} />
+                            </button>
+                            <button
+                                type="button"
+                                className="feed-adaptive-profile"
+                                onClick={() => navigate(currentUserId ? `/profile/${currentUserId}` : '/profile')}
+                                aria-label="Open profile"
+                            >
+                                <Avatar src={currentUser?.avatar} size="md" alt={currentUser?.fullname || 'Profile'} />
+                            </button>
+                        </div>
+                    </div>
+
+                    <StoryRail />
+
                     <div className="feed-header-unified">
                         <h1>Feeds</h1>
                         <div className="header-filters">
@@ -206,7 +245,5 @@ const Feed = () => {
         </div>
     );
 };
-
-Feed.whyDidYouRender = true;
 
 export default Feed;

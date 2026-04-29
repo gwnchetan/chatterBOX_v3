@@ -53,17 +53,15 @@ const jwt = require('jsonwebtoken');
 
 const loginUser = async (req, res) => {
     try {
-        const { username, password } = req.body;
+        const { email, password } = req.body;
 
         // 1. Basic Validation
-        if (!username || !password) {
-            return res.status(400).json({ message: "Username and password are required" });
+        if (!email || !password) {
+            return res.status(400).json({ message: "Email and password are required" });
         }
 
-        // 2. Find User (allow login by email or username)
-        const user = await User.findOne({
-            $or: [{ email: username }, { username: username }]
-        });
+        // 2. Find User by email
+        const user = await User.findOne({ email });
 
         if (!user) {
             return res.status(404).json({ message: "User not found" });

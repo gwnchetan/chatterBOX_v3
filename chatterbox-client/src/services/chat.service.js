@@ -60,6 +60,16 @@ const chatService = {
     rejectRequest: async (conversationId) => {
         const response = await api.post(`/chat/request/${conversationId}/reject`);
         return response.data;
+    },
+
+    deleteConversation: async (conversationId) => {
+        const response = await api.delete(`/chat/conversations/${conversationId}`);
+        return response.data;
+    },
+
+    deleteMessage: async (conversationId, messageId) => {
+        const response = await api.delete(`/chat/conversations/${conversationId}/messages/${messageId}`);
+        return response.data;
     }
 };
 

@@ -5,7 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import chatService from '../../services/chat.service';
 
-const ConversationList = ({ conversations, followingList, activeId, onlineUsers, currentUserId, activeTab, setActiveTab, requestCount }) => {
+const ConversationList = ({ conversations, knownConversations, followingList, activeId, onlineUsers, currentUserId, activeTab, setActiveTab, requestCount, sentCount }) => {
     const [filter, setFilter] = useState('');
     const navigate = useNavigate();
 
@@ -26,7 +26,7 @@ const ConversationList = ({ conversations, followingList, activeId, onlineUsers,
     // 4. Handle Starting Chat from Following
     const handleStartChat = async (targetUserId) => {
         try {
-            const existing = conversations?.find(c => c.participants.some(p => p._id === targetUserId));
+            const existing = knownConversations?.find(c => c.participants.some(p => p._id === targetUserId));
             if (existing) {
                 navigate(`/chat/${existing._id}`);
             } else {
@@ -55,6 +55,13 @@ const ConversationList = ({ conversations, followingList, activeId, onlineUsers,
                     >
                         Requests
                         {requestCount > 0 && <span className="badge">{requestCount}</span>}
+                    </button>
+                    <button
+                        className={`chat-tab ${activeTab === 'sent' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('sent')}
+                    >
+                        Sent
+                        {sentCount > 0 && <span className="badge">{sentCount}</span>}
                     </button>
                 </div>
 

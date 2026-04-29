@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/user.controller');
+const { uploadStory, getStoryFeed, getUserStories, deleteStory, viewStory } = require('../controllers/user.controller');
 const authMiddleware = require('../middleware/auth.middleware'); // Assuming it exists
 
 // All profile routes require authentication
@@ -18,6 +19,13 @@ router.post('/unsave/:postId', authMiddleware, userController.unsavePost);
 
 // Update profile
 router.patch('/profile', authMiddleware, userController.updateProfile);
+
+// Story routes (Must be before /:userId to prevent route conflicts)
+router.post('/story', authMiddleware, uploadStory);
+router.get('/story/feed', authMiddleware, getStoryFeed);
+router.get('/story/:userId', authMiddleware, getUserStories);
+router.delete('/story/:storyId', authMiddleware, deleteStory);
+router.post('/story/:userId/:storyId/view', authMiddleware, viewStory);
 
 const optionalAuthMiddleware = require('../middleware/optionalAuth.middleware');
 

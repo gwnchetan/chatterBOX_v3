@@ -16,6 +16,7 @@ const Favorites = lazy(() => import('./pages/favorites'));
 const WIP = lazy(() => import('./pages/wip'));
 const NotificationsPage = lazy(() => import('./pages/notifications'));
 const Chat = lazy(() => import('./pages/Chat'));
+const StoryViewer = lazy(() => import('./pages/story-viewer'));
 
 const mergeNotification = (currentNotifications, incomingNotification) => {
     const notifications = Array.isArray(currentNotifications) ? currentNotifications : [];
@@ -171,6 +172,11 @@ function App() {
                         <Route path="/notifications" element={
                             <ProtectedRoute>
                                 <NotificationsPage />
+                            </ProtectedRoute>
+                        } />
+                        <Route path="/stories/:userId" element={
+                            <ProtectedRoute>
+                                <StoryViewer />
                             </ProtectedRoute>
                         } />
                         <Route path="/chat" element={

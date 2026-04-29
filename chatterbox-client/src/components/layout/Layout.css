@@ -58,10 +58,29 @@
     flex-shrink: 0;
     cursor: pointer;
     transition: transform 0.2s;
+    border: 2px solid transparent;
+    background: transparent;
+    padding: 0;
+}
+
+.story-card-button {
+    appearance: none;
+    border: 2px solid transparent;
+    outline: none;
+    color: inherit;
+    text-align: left;
 }
 
 .story-card:hover {
     transform: scale(1.02);
+}
+
+.story-card--unseen {
+    border-color: rgba(236, 72, 153, 0.9);
+}
+
+.story-card--seen {
+    border-color: rgba(148, 163, 184, 0.25);
 }
 
 .story-bg {

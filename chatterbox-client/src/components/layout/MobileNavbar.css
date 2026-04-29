@@ -6,9 +6,10 @@
     left: 0;
     right: 0;
     background-color: var(--surface-bg);
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--color-border);
     z-index: 1000;
     padding-bottom: env(safe-area-inset-bottom);
+    backdrop-filter: blur(16px);
 }
 
 @media (max-width: 700px) {
@@ -32,12 +33,12 @@
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    color: var(--text-secondary);
+    color: var(--color-text-muted);
     height: 100%;
 }
 
 .mobile-nav-item.active {
-    color: var(--primary-color);
+    color: var(--color-primary);
 }
 
 .icon-wrapper {

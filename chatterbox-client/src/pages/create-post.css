@@ -21,7 +21,7 @@
 /* --- LAYOUT CONTAINER (MOBILE FIRST) --- */
 .create-post-container {
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
     background-color: var(--cp-bg);
     display: flex;
     flex-direction: column;
@@ -50,6 +50,12 @@
     font-size: 1rem;
     font-weight: 700;
     color: var(--cp-text-main);
+}
+
+.create-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .icon-btn {
@@ -98,6 +104,10 @@
     background-color: var(--cp-border);
     cursor: not-allowed;
     opacity: 0.7;
+}
+
+.story-publish-btn {
+    background: linear-gradient(135deg, #f97316, #ec4899);
 }
 
 
@@ -219,6 +229,7 @@
     flex-direction: column;
     flex: 1;
     /* Takes remaining space if needed */
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
 }
 
 .user-mini-header {
@@ -312,6 +323,24 @@
 /* Hide Large Share on Mobile since we have header button */
 .share-btn-large {
     display: none;
+}
+
+.create-inline-loader {
+    width: 100%;
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--cp-text-muted);
+    font-size: 0.95rem;
+}
+
+.create-modal-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 20001;
+    background: rgba(4, 6, 16, 0.72);
+    backdrop-filter: blur(10px);
 }
 
 
@@ -409,9 +438,7 @@
 
     /* 2. Header (Grid Layout) */
     .create-header {
-        width: 70vw;
-        /* Match Body Width */
-        max-width: 1400px;
+        width: min(92vw, 1400px);
         /* Max cap */
         border-radius: 12px 12px 0 0;
         border: 1px solid var(--cp-border);
@@ -442,8 +469,7 @@
     .create-body {
         flex-direction: row;
         /* Side-by-side */
-        width: 70vw;
-        max-width: 1400px;
+        width: min(92vw, 1400px);
         height: 80vh;
         /* Fixed height for modal */
         background-color: var(--cp-bg);
@@ -709,7 +735,7 @@
     top: 0;
     left: 0;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
     background-color: var(--cp-bg);
     display: flex;
     flex-direction: column;
@@ -724,4 +750,33 @@
     font-size: 1.5rem;
     font-weight: 600;
     margin-bottom: 8px;
+}
+
+@media (max-width: 560px) {
+    .create-header {
+        padding: 0 12px;
+        gap: 10px;
+    }
+
+    .create-header h2 {
+        font-size: 0.95rem;
+    }
+
+    .create-header-actions {
+        gap: 6px;
+    }
+
+    .publish-btn {
+        padding: 8px 12px;
+        font-size: 0.82rem;
+    }
+
+    .media-preview-section {
+        min-height: 280px;
+    }
+
+    .caption-input {
+        min-height: 92px;
+        font-size: 0.95rem;
+    }
 }

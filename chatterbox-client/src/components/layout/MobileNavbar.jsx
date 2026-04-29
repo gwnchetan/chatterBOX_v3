@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import './MobileNavbar.css';
-import { Home, Search, Bell, User, Plus } from '../common/Icons';
+import { Home, Search, MessageSquare, User, Plus } from '../common/Icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const MobileNavbar = () => {
@@ -9,6 +9,7 @@ const MobileNavbar = () => {
 
     // Simple helper to check active
     const isActive = (path) => location.pathname === path;
+    const isChatActive = () => location.pathname === '/chat' || location.pathname.startsWith('/chat/');
 
     const isProfileActive = () => {
         const user = JSON.parse(localStorage.getItem('user'));
@@ -47,11 +48,11 @@ const MobileNavbar = () => {
                 </button>
 
                 <button
-                    className={`mobile-nav-item ${isActive('/notifications') ? 'active' : ''}`}
-                    onClick={() => navigate('/notifications')}
+                    className={`mobile-nav-item ${isChatActive() ? 'active' : ''}`}
+                    onClick={() => navigate('/chat')}
                 >
                     <div className="icon-wrapper">
-                        <Bell size={24} />
+                        <MessageSquare size={24} />
                     </div>
                 </button>
 

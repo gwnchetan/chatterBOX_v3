@@ -1,24 +1,26 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import EmojiPicker from 'emoji-picker-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../components/Toast';
-import { Image, Smile, X, ChevronLeft, ChevronRight, User, Play, Volume2, VolumeX, AlertTriangle } from '../components/common/Icons';
-import GiphyPicker from '../components/create/GiphyPicker';
-import ImageEditor from '../components/create/ImageEditor';
-import LogoLoader from '../components/common/LogoLoader';
+import { Image, Smile, X, ChevronLeft } from '../components/common/Icons';
 import getCroppedImg from '../utils/cropUtils';
-import { validateMediaAddition, validatePostPayload } from '../utils/mediaRules';
+import { validateMediaAddition } from '../utils/mediaRules';
 import { cloudinaryService } from '../services/cloudinary.service';
-import { postsService } from '../services/posts.service';
-import VideoEditor from '../components/create/VideoEditor';
+import userService from '../services/user.service';
 import './create-post.css';
 
 
 
 import { useUpload } from '../context/UploadContext';
 
+const EmojiPicker = lazy(() => import('emoji-picker-react'));
+const GiphyPicker = lazy(() => import('../components/create/GiphyPicker'));
+const ImageEditor = lazy(() => import('../components/create/ImageEditor'));
+const VideoEditor = lazy(() => import('../components/create/VideoEditor'));
+
 const CreatePost = () => {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const toast = useToast();
     const { startUpload } = useUpload(); // 1. Use Hook
 
@@ -64,6 +66,49 @@ const CreatePost = () => {
         // 3. Immediate Exit
         toast.info("Posting in background...");
         navigate('/feed');
+    };
+
+    const handlePostAsStory = async () => {
+        if (media.length === 0) {
+            toast.error("Stories require one image or video");
+            return;
+        }
+
+        if (media.length > 1) {
+            toast.error("Stories only support 1 media item");
+            return;
+        }
+
+        try {
+            toast.info("Uploading story...");
+            let mediaUrl = '';
+            let mediaType = 'image';
+
+            if (media.length === 1) {
+                const item = media[0];
+                if (item.provider === 'local') {
+                    // Upload to Cloudinary — same as post flow
+                    const uploaded = await cloudinaryService.uploadMedia(item.file);
+                    mediaUrl = uploaded.url;
+                    mediaType = item.type === 'gif' ? 'image' : item.type;
+                } else {
+                    mediaUrl = item.url;
+                    mediaType = item.type === 'gif' ? 'image' : item.type;
+                }
+            }
+
+            await userService.uploadStory(mediaUrl, mediaType, caption.trim());
+
+            // Invalidate story feed caches
+            queryClient.invalidateQueries({ queryKey: ['storyFeed'] });
+            queryClient.invalidateQueries({ queryKey: ['userStories'] });
+
+            toast.success("Story posted!");
+            navigate('/feed');
+        } catch (err) {
+            toast.error("Failed to post story");
+            console.error(err);
+        }
     };
 
     // --- Media Handling ---
@@ -201,13 +246,20 @@ const CreatePost = () => {
 
                 {/* Right Side Actions */}
                 {editingIndex === null ? (
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div className="create-header-actions">
                         <button
                             className="publish-btn"
                             onClick={handlePublish}
                             disabled={!caption && media.length === 0}
                         >
                             Share
+                        </button>
+                        <button
+                            className="publish-btn story-publish-btn"
+                            onClick={handlePostAsStory}
+                            disabled={media.length === 0}
+                        >
+                            + Story
                         </button>
                     </div>
                 ) : (
@@ -224,50 +276,52 @@ const CreatePost = () => {
                     {editingIndex !== null ? (
                         // --- EDITOR MODE ---
                         <div className="editor-container">
-                            {isVideoEditorOpen ? (
-                                <VideoEditor
-                                    videoSrc={media[editingIndex].originalUrl}
-                                    onSave={handleVideoSave}
-                                    onCancel={() => {
-                                        setEditingIndex(null);
-                                        setIsVideoEditorOpen(false);
-                                    }}
-                                />
-                            ) : (
-                                <ImageEditor
-                                    imageSrc={media[editingIndex].originalUrl || media[editingIndex].previewUrl}
-                                    initialCrop={media[editingIndex].crop}
-                                    initialZoom={media[editingIndex].zoom}
-                                    initialRotate={media[editingIndex].rotation}
-                                    initialAspect={media[editingIndex].aspect}
-                                    onCancel={() => setEditingIndex(null)}
-                                    onSave={async (updates) => {
-                                        let newPreviewUrl = media[editingIndex].previewUrl;
+                            <Suspense fallback={<div className="create-inline-loader">Loading editor...</div>}>
+                                {isVideoEditorOpen ? (
+                                    <VideoEditor
+                                        videoSrc={media[editingIndex].originalUrl}
+                                        onSave={handleVideoSave}
+                                        onCancel={() => {
+                                            setEditingIndex(null);
+                                            setIsVideoEditorOpen(false);
+                                        }}
+                                    />
+                                ) : (
+                                    <ImageEditor
+                                        imageSrc={media[editingIndex].originalUrl || media[editingIndex].previewUrl}
+                                        initialCrop={media[editingIndex].crop}
+                                        initialZoom={media[editingIndex].zoom}
+                                        initialRotate={media[editingIndex].rotation}
+                                        initialAspect={media[editingIndex].aspect}
+                                        onCancel={() => setEditingIndex(null)}
+                                        onSave={async (updates) => {
+                                            let newPreviewUrl = media[editingIndex].previewUrl;
 
-                                        if (updates.croppedAreaPixels) {
-                                            try {
-                                                const sourceUrl = media[editingIndex].originalUrl || media[editingIndex].previewUrl;
-                                                const { url } = await getCroppedImg(sourceUrl, updates.croppedAreaPixels, updates.rotation);
-                                                newPreviewUrl = url;
-                                            } catch (e) {
-                                                console.error("Preview gen failed", e);
+                                            if (updates.croppedAreaPixels) {
+                                                try {
+                                                    const sourceUrl = media[editingIndex].originalUrl || media[editingIndex].previewUrl;
+                                                    const { url } = await getCroppedImg(sourceUrl, updates.croppedAreaPixels, updates.rotation);
+                                                    newPreviewUrl = url;
+                                                } catch (e) {
+                                                    console.error("Preview gen failed", e);
+                                                }
                                             }
-                                        }
 
-                                        setMedia(prev => {
-                                            const n = [...prev];
-                                            n[editingIndex] = {
-                                                ...n[editingIndex],
-                                                ...updates,
-                                                isEdited: true,
-                                                previewUrl: newPreviewUrl
-                                            };
-                                            return n;
-                                        });
-                                        setEditingIndex(null);
-                                    }}
-                                />
-                            )}
+                                            setMedia(prev => {
+                                                const n = [...prev];
+                                                n[editingIndex] = {
+                                                    ...n[editingIndex],
+                                                    ...updates,
+                                                    isEdited: true,
+                                                    previewUrl: newPreviewUrl
+                                                };
+                                                return n;
+                                            });
+                                            setEditingIndex(null);
+                                        }}
+                                    />
+                                )}
+                            </Suspense>
                         </div>
                     ) : (
                         // --- GRID MODE ---
@@ -351,9 +405,11 @@ const CreatePost = () => {
                         </div>
 
                         {showEmojiPicker && (
-                            <div className="emoji-picker-popover">
-                                <EmojiPicker onEmojiClick={(e) => setCaption(c => c + e.emoji)} theme="dark" width="100%" height={300} previewConfig={{ showPreview: false }} />
-                            </div>
+                            <Suspense fallback={<div className="create-inline-loader">Loading emoji picker...</div>}>
+                                <div className="emoji-picker-popover">
+                                    <EmojiPicker onEmojiClick={(e) => setCaption(c => c + e.emoji)} theme="dark" width="100%" height={300} previewConfig={{ showPreview: false }} />
+                                </div>
+                            </Suspense>
                         )}
 
                         <input
@@ -370,10 +426,12 @@ const CreatePost = () => {
 
             {
                 showGiphyPicker && (
-                    <GiphyPicker
-                        onSelect={handleGiphySelect}
-                        onClose={() => setShowGiphyPicker(false)}
-                    />
+                    <Suspense fallback={<div className="create-inline-loader create-modal-loader">Loading GIFs...</div>}>
+                        <GiphyPicker
+                            onSelect={handleGiphySelect}
+                            onClose={() => setShowGiphyPicker(false)}
+                        />
+                    </Suspense>
                 )
             }
         </div >

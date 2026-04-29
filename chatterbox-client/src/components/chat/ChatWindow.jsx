@@ -1,25 +1,33 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useInView } from 'react-intersection-observer';
+import { useNavigate } from 'react-router-dom';
 import chatService from '../../services/chat.service';
+import userService from '../../services/user.service';
 import { socketService } from '../../services/socket.service';
 import MessageBubble from './MessageBubble';
 import Avatar from '../common/Avatar';
 import LogoLoader from '../common/LogoLoader';
-import { Send, MoreHorizontal, Phone, Video } from '../common/Icons';
+import { ChevronLeft, Send, MoreHorizontal, Phone, Video } from '../common/Icons';
+import { useToast } from '../Toast';
 
 const ChatWindow = ({ conversationId, conversation, currentUser }) => {
+    const navigate = useNavigate();
     const queryClient = useQueryClient();
+    const toast = useToast();
     const [newMessage, setNewMessage] = useState('');
+    const [menuOpen, setMenuOpen] = useState(false);
     const bottomRef = useRef(null);
     const textareaRef = useRef(null);
+    const menuRef = useRef(null);
 
     const {
         data,
         fetchNextPage,
         hasNextPage,
         isFetchingNextPage,
-        isLoading
+        isLoading,
+        error: messagesError
     } = useInfiniteQuery({
         queryKey: ['messages', conversationId],
         queryFn: ({ pageParam = null }) => chatService.getMessages(conversationId, pageParam),
@@ -33,6 +41,13 @@ const ChatWindow = ({ conversationId, conversation, currentUser }) => {
     const messages = messagePages.length
         ? [...messagePages].reverse().flatMap((page) => page)
         : [];
+
+    const { data: blockedUsersData } = useQuery({
+        queryKey: ['blocked-users'],
+        queryFn: userService.getBlockedUsers,
+        enabled: !!currentUser?._id && !!conversation,
+        staleTime: 1000 * 60
+    });
 
     useEffect(() => {
         if (!conversationId) return;
@@ -84,10 +99,11 @@ const ChatWindow = ({ conversationId, conversation, currentUser }) => {
             setNewMessage('');
             return { previousMessages };
         },
-        onError: (_error, _content, context) => {
+        onError: (error, _content, context) => {
             if (context?.previousMessages) {
                 queryClient.setQueryData(['messages', conversationId], context.previousMessages);
             }
+            toast.error(error.response?.data?.message || 'Failed to send message');
         },
         onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
@@ -120,12 +136,33 @@ const ChatWindow = ({ conversationId, conversation, currentUser }) => {
         }
     }, [fetchNextPage, hasNextPage, inView]);
 
+    useEffect(() => {
+        if (!menuOpen) {
+            return undefined;
+        }
+
+        const handleOutsideClick = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                setMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleOutsideClick);
+        return () => document.removeEventListener('mousedown', handleOutsideClick);
+    }, [menuOpen]);
+
+    const otherUser = conversation?.participants?.find((participant) => participant?._id !== currentUser?._id) || null;
+    const isBlockedByCurrentUser = blockedUsersData?.blockedUsers?.some((user) => String(user._id) === String(otherUser?._id));
+
     const handleAccept = async () => {
         try {
             await chatService.acceptRequest(conversationId);
             queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            queryClient.invalidateQueries({ queryKey: ['notifications'] });
+            toast.success('Request accepted');
         } catch (error) {
             console.error(error);
+            toast.error(error.response?.data?.message || 'Failed to accept request');
         }
     };
 
@@ -133,8 +170,81 @@ const ChatWindow = ({ conversationId, conversation, currentUser }) => {
         try {
             await chatService.rejectRequest(conversationId);
             queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            queryClient.invalidateQueries({ queryKey: ['notifications'] });
+            navigate('/chat');
+            toast.success('Request rejected');
         } catch (error) {
             console.error(error);
+            toast.error(error.response?.data?.message || 'Failed to reject request');
+        }
+    };
+
+    const handleDeleteConversation = async () => {
+        const confirmed = window.confirm('Delete this conversation from your chat list?');
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            await chatService.deleteConversation(conversationId);
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+            queryClient.invalidateQueries({ queryKey: ['notifications'] });
+            setMenuOpen(false);
+            navigate('/chat');
+            toast.success('Conversation deleted');
+        } catch (error) {
+            console.error(error);
+            toast.error(error.response?.data?.message || 'Failed to delete conversation');
+        }
+    };
+
+    const handleDeleteMessage = async (messageId) => {
+        const confirmed = window.confirm('Delete this message for everyone?');
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            await chatService.deleteMessage(conversationId, messageId);
+            queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            toast.success('Message deleted');
+        } catch (error) {
+            console.error(error);
+            toast.error(error.response?.data?.message || 'Failed to delete message');
+        }
+    };
+
+    const handleBlockToggle = async () => {
+        if (!otherUser?._id) {
+            return;
+        }
+
+        const actionLabel = isBlockedByCurrentUser ? 'unblock' : 'block';
+        const confirmed = window.confirm(`Do you want to ${actionLabel} this user?`);
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            if (isBlockedByCurrentUser) {
+                await userService.unblockUser(otherUser._id);
+                toast.success('User unblocked');
+            } else {
+                await userService.blockUser(otherUser._id);
+                toast.success('User blocked');
+                navigate('/chat');
+            }
+
+            queryClient.invalidateQueries({ queryKey: ['blocked-users'] });
+            queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            queryClient.invalidateQueries({ queryKey: ['following'] });
+            queryClient.invalidateQueries({ queryKey: ['notifications'] });
+            setMenuOpen(false);
+        } catch (error) {
+            console.error(error);
+            toast.error(error.response?.data?.message || `Failed to ${actionLabel} user`);
         }
     };
 
@@ -146,29 +256,88 @@ const ChatWindow = ({ conversationId, conversation, currentUser }) => {
     const requesterId = conversation?.requestedBy?._id || conversation?.requestedBy;
     const isRequester = requesterId === currentUser?._id;
     const isReceiver = isPending && !isRequester;
-    const otherUser = conversation?.participants?.find((participant) => participant?._id !== currentUser?._id) || { fullname: 'Chat' };
+    const pendingMessageSent = isRequester && isPending && messages.length > 0;
+    const canSendMessage = !isReceiver && !isBlockedByCurrentUser && !pendingMessageSent;
+    const displayUser = otherUser || { fullname: 'Chat', username: '' };
+
+    if (!conversation && isLoading) {
+        return (
+            <div className="chat-window-empty">
+                <LogoLoader size="2rem" text="Loading conversation..." />
+            </div>
+        );
+    }
+
+    if (!conversation) {
+        return (
+            <div className="chat-window-empty">
+                <div className="empty-state-content">
+                    <h2 className="empty-title">Conversation unavailable</h2>
+                    <p className="empty-subtitle">This chat is not available in your inbox right now.</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (messagesError) {
+        return (
+            <div className="chat-window-empty">
+                <div className="empty-state-content">
+                    <h2 className="empty-title">Unable to load messages</h2>
+                    <p className="empty-subtitle">{messagesError.response?.data?.message || 'This conversation is not available.'}</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="chat-window-container">
             <header className="chat-header">
                 <div className="chat-header-user">
-                    <Avatar src={otherUser.avatar} size="sm" />
+                    <button
+                        type="button"
+                        className="chat-mobile-back"
+                        onClick={() => navigate('/chat')}
+                        aria-label="Back to chat list"
+                    >
+                        <ChevronLeft size={20} />
+                    </button>
+                    <Avatar src={displayUser.avatar} size="sm" />
                     <div className="user-details">
-                        <span className="user-name">{otherUser.fullname}</span>
-                        {otherUser.username && <span className="user-handle">@{otherUser.username}</span>}
+                        <span className="user-name">{displayUser.fullname}</span>
+                        {displayUser.username && <span className="user-handle">@{displayUser.username}</span>}
                     </div>
                 </div>
-                <div className="chat-actions">
+                <div className="chat-actions" ref={menuRef}>
                     <button><Phone size={20} /></button>
                     <button><Video size={20} /></button>
-                    <button><MoreHorizontal size={20} /></button>
+                    <button type="button" onClick={() => setMenuOpen((currentValue) => !currentValue)}>
+                        <MoreHorizontal size={20} />
+                    </button>
+                    {menuOpen && (
+                        <div className="chat-actions-menu">
+                            {isPending && isRequester && (
+                                <button type="button" onClick={handleReject}>
+                                    Cancel request
+                                </button>
+                            )}
+                            <button type="button" onClick={handleDeleteConversation}>
+                                Delete chat
+                            </button>
+                            {otherUser?._id && (
+                                <button type="button" onClick={handleBlockToggle}>
+                                    {isBlockedByCurrentUser ? 'Unblock user' : 'Block user'}
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
             </header>
 
             {isReceiver && (
                 <div className="request-banner">
                     <div className="request-banner-content">
-                        <p><strong>{otherUser.fullname}</strong> wants to send you a message.</p>
+                        <p><strong>{displayUser.fullname}</strong> wants to send you a message.</p>
                         <p className="subtext">They will only be able to keep chatting after you accept.</p>
                         <div className="request-actions">
                             <button className="btn-reject" onClick={handleReject}>Reject</button>
@@ -180,7 +349,23 @@ const ChatWindow = ({ conversationId, conversation, currentUser }) => {
 
             {isRequester && isPending && (
                 <div className="request-banner">
-                    <p>Request sent. You can send one message while this request is pending.</p>
+                    <div className="request-banner-content">
+                        <p>{pendingMessageSent ? 'Request sent. Wait for acceptance to send more messages.' : 'Request sent. You can send one message while this request is pending.'}</p>
+                        <div className="request-actions">
+                            <button className="btn-reject" onClick={handleReject}>Cancel Request</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isBlockedByCurrentUser && (
+                <div className="request-banner">
+                    <div className="request-banner-content">
+                        <p>You blocked this user.</p>
+                        <div className="request-actions">
+                            <button className="btn-accept" onClick={handleBlockToggle}>Unblock</button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -203,13 +388,15 @@ const ChatWindow = ({ conversationId, conversation, currentUser }) => {
                             isOwn={isOwn}
                             showAvatar={showAvatar}
                             sender={message.sender}
+                            canDelete={isOwn && !message.isDeleted}
+                            onDelete={handleDeleteMessage}
                         />
                     );
                 })}
                 <div ref={bottomRef} />
             </div>
 
-            {(!isReceiver && !(isRequester && isPending && messages.length > 0)) && (
+            {canSendMessage && (
                 <form className="chat-input-area" onSubmit={handleSend}>
                     <textarea
                         ref={textareaRef}
@@ -223,12 +410,6 @@ const ChatWindow = ({ conversationId, conversation, currentUser }) => {
                         <Send size={20} />
                     </button>
                 </form>
-            )}
-
-            {(isRequester && isPending && messages.length > 0) && (
-                <div className="p-4 text-center text-gray-500 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-                    <p className="text-sm">Request sent. You can send more messages once accepted.</p>
-                </div>
             )}
         </div>
     );

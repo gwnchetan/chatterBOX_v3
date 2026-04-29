@@ -28,6 +28,38 @@ const populateConversation = async (conversationId) => Conversation.findById(con
     .populate('participants', 'username fullname avatar isPrivate')
     .lean();
 
+const isConversationHiddenForUser = (conversation, userId) => (
+    conversation?.hiddenFor?.some((hiddenUserId) => normalizeId(hiddenUserId) === normalizeId(userId))
+);
+
+const syncConversationLastMessage = async (conversationId) => {
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+        return null;
+    }
+
+    const latestMessage = await Message.findOne({
+        conversationId,
+        isDeleted: false
+    })
+        .sort({ createdAt: -1 })
+        .select('content sender createdAt')
+        .lean();
+
+    if (latestMessage) {
+        conversation.lastMessage = {
+            text: latestMessage.content?.text || '',
+            sender: latestMessage.sender,
+            updatedAt: latestMessage.createdAt
+        };
+    } else {
+        conversation.lastMessage = undefined;
+    }
+
+    await conversation.save();
+    return conversation;
+};
+
 const emitConversationUpdate = async (conversationId, reason) => {
     const conversation = await populateConversation(conversationId);
     if (!conversation) return null;
@@ -110,6 +142,13 @@ exports.initiateConversation = async (req, res) => {
         }
 
         if (conversation && conversation.status !== 'rejected') {
+            if (isConversationHiddenForUser(conversation, currentUserId)) {
+                conversation.hiddenFor = (conversation.hiddenFor || []).filter(
+                    (hiddenUserId) => normalizeId(hiddenUserId) !== normalizeId(currentUserId)
+                );
+                await conversation.save();
+            }
+
             const hydratedConversation = await populateConversation(conversation._id);
             return res.json(hydratedConversation);
         }
@@ -127,13 +166,15 @@ exports.initiateConversation = async (req, res) => {
         if (conversation) {
             conversation.status = 'pending';
             conversation.requestedBy = currentUserId;
+            conversation.hiddenFor = [];
             conversation.rejectedAt = undefined;
             await conversation.save();
         } else {
             conversation = new Conversation({
                 participants: [currentUserId, targetUserId],
                 status: 'pending',
-                requestedBy: currentUserId
+                requestedBy: currentUserId,
+                hiddenFor: []
             });
             await conversation.save();
         }
@@ -224,6 +265,9 @@ exports.sendMessage = async (req, res) => {
             sender: senderId,
             updatedAt: newMessage.createdAt
         };
+        conversation.hiddenFor = (conversation.hiddenFor || []).filter(
+            (hiddenUserId) => !participantIds.includes(normalizeId(hiddenUserId))
+        );
         await conversation.save();
 
         await newMessage.populate('sender', 'username fullname avatar');
@@ -267,6 +311,10 @@ exports.getMessages = async (req, res) => {
             return res.status(403).json({ message: 'Not a participant' });
         }
 
+        if (isConversationHiddenForUser(conversation, userId)) {
+            return res.status(404).json({ message: 'Conversation not found' });
+        }
+
         const viewerContext = await getViewerContext(userId);
         const otherUserId = participantIds.find((id) => id !== userId);
         if (viewerContext.isHiddenUser(otherUserId)) {
@@ -298,7 +346,8 @@ exports.getConversations = async (req, res) => {
         const viewerContext = await getViewerContext(userId);
 
         const query = {
-            participants: userId
+            participants: userId,
+            hiddenFor: { $ne: userId }
         };
 
         if (type === 'requests') {
@@ -331,7 +380,17 @@ exports.getConversations = async (req, res) => {
 exports.markAsRead = async (req, res) => {
     try {
         const { conversationId } = req.params;
-        const userId = req.user._id;
+        const userId = req.user._id.toString();
+
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation) {
+            return res.status(404).json({ message: 'Conversation not found' });
+        }
+
+        const participantIds = conversation.participants.map((id) => normalizeId(id));
+        if (!participantIds.includes(userId) || isConversationHiddenForUser(conversation, userId)) {
+            return res.status(404).json({ message: 'Conversation not found' });
+        }
 
         await Message.updateMany(
             { conversationId, readBy: { $ne: userId } },
@@ -361,17 +420,24 @@ exports.acceptChatRequest = async (req, res) => {
             return res.status(404).json({ message: 'Conversation not found' });
         }
 
+        const userIdStr = normalizeId(userId);
+        const participantIds = conversation.participants.map((participantId) => normalizeId(participantId));
+        if (!participantIds.includes(userIdStr) || isConversationHiddenForUser(conversation, userIdStr)) {
+            return res.status(404).json({ message: 'Conversation not found' });
+        }
+
         if (conversation.status !== 'pending') {
             return res.status(400).json({ message: 'Conversation is not pending' });
         }
 
-        if (normalizeId(conversation.requestedBy) === normalizeId(userId)) {
+        if (normalizeId(conversation.requestedBy) === userIdStr) {
             return res.status(400).json({ message: 'Cannot accept your own request' });
         }
 
         conversation.status = 'active';
         conversation.requestedBy = undefined;
         await conversation.save();
+        await Notification.deleteMany({ conversation: conversationId, type: 'message' });
 
         await emitConversationUpdate(conversationId, 'request_accepted');
 
@@ -395,13 +461,19 @@ exports.rejectChatRequest = async (req, res) => {
             return res.status(404).json({ message: 'Conversation not found' });
         }
 
+        const userIdStr = normalizeId(userId);
+        const participantIds = conversation.participants.map((participantId) => normalizeId(participantId));
+        if (!participantIds.includes(userIdStr) || isConversationHiddenForUser(conversation, userIdStr)) {
+            return res.status(404).json({ message: 'Conversation not found' });
+        }
+
         if (conversation.status !== 'pending') {
             return res.status(400).json({ message: 'Conversation is not pending' });
         }
 
-        if (normalizeId(conversation.requestedBy) === normalizeId(userId)) {
-            const participantIds = conversation.participants.map((participantId) => normalizeId(participantId));
+        if (normalizeId(conversation.requestedBy) === userIdStr) {
             await Notification.deleteMany({ conversation: conversationId, type: 'message' });
+            await Message.deleteMany({ conversationId });
             await Conversation.findByIdAndDelete(conversationId);
             participantIds.forEach((participantId) => {
                 getIo().to(`user:${participantId}`).emit('chat:conversation:update', {
@@ -421,6 +493,107 @@ exports.rejectChatRequest = async (req, res) => {
         res.json({ message: 'Request rejected' });
     } catch (error) {
         console.error('Reject Request Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+exports.deleteMessage = async (req, res) => {
+    try {
+        const { conversationId, messageId } = req.params;
+        const userId = req.user._id.toString();
+
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation) {
+            return res.status(404).json({ message: 'Conversation not found' });
+        }
+
+        const participantIds = conversation.participants.map((participantId) => normalizeId(participantId));
+        if (!participantIds.includes(userId) || isConversationHiddenForUser(conversation, userId)) {
+            return res.status(404).json({ message: 'Conversation not found' });
+        }
+
+        const message = await Message.findOne({ _id: messageId, conversationId });
+        if (!message) {
+            return res.status(404).json({ message: 'Message not found' });
+        }
+
+        if (normalizeId(message.sender) !== userId) {
+            return res.status(403).json({ message: 'You can only delete your own messages.' });
+        }
+
+        if (!message.isDeleted) {
+            message.isDeleted = true;
+            message.deletedAt = new Date();
+            message.content = {
+                text: '',
+                media: []
+            };
+            await message.save();
+            await syncConversationLastMessage(conversationId);
+            await emitConversationUpdate(conversationId, 'message_deleted');
+        }
+
+        res.json({ message: 'Message deleted' });
+    } catch (error) {
+        console.error('Delete Message Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+exports.deleteConversation = async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const userId = req.user._id.toString();
+
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation) {
+            return res.status(404).json({ message: 'Conversation not found' });
+        }
+
+        const participantIds = conversation.participants.map((participantId) => normalizeId(participantId));
+        if (!participantIds.includes(userId)) {
+            return res.status(403).json({ message: 'Not a participant' });
+        }
+
+        const requesterId = normalizeId(conversation.requestedBy);
+
+        if (conversation.status === 'pending' && requesterId === userId) {
+            await Notification.deleteMany({ conversation: conversationId, type: 'message' });
+            await Message.deleteMany({ conversationId });
+            await Conversation.findByIdAndDelete(conversationId);
+
+            participantIds.forEach((participantId) => {
+                getIo().to(`user:${participantId}`).emit('chat:conversation:update', {
+                    reason: 'request_cancelled',
+                    conversation: { _id: conversationId, deleted: true }
+                });
+            });
+
+            return res.json({ message: 'Request cancelled' });
+        }
+
+        if (conversation.status === 'pending' && requesterId !== userId) {
+            conversation.status = 'rejected';
+            conversation.rejectedAt = new Date();
+            await conversation.save();
+            await Notification.deleteMany({ conversation: conversationId, type: 'message' });
+            await emitConversationUpdate(conversationId, 'request_rejected');
+            return res.json({ message: 'Request rejected' });
+        }
+
+        if (!isConversationHiddenForUser(conversation, userId)) {
+            conversation.hiddenFor = [...(conversation.hiddenFor || []), req.user._id];
+            await conversation.save();
+        }
+
+        getIo().to(`user:${userId}`).emit('chat:conversation:update', {
+            reason: 'conversation_deleted',
+            conversation: { _id: conversationId, deleted: true }
+        });
+
+        res.json({ message: 'Conversation deleted' });
+    } catch (error) {
+        console.error('Delete Conversation Error:', error);
         res.status(500).json({ message: 'Server Error' });
     }
 };

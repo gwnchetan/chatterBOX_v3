@@ -598,3 +598,214 @@ exports.getBlockedUsers = async (req, res) => {
         res.status(500).json({ message: 'Internal server error' });
     }
 };
+
+// Stories
+const STORY_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24hrs
+
+const isStoryActive = (story) => (
+    Date.now() - new Date(story.createdAt).getTime() < STORY_EXPIRY_MS
+);
+
+const getActiveStories = (stories = []) => (
+    stories
+        .filter((story) => isStoryActive(story))
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+);
+
+const buildStoryPayload = (user, stories) => ({
+    userId: user._id,
+    username: user.username,
+    fullname: user.fullname,
+    avatar: user.avatar,
+    isPrivate: !!user.isPrivate,
+    stories
+});
+
+const canViewStoriesForUser = (targetUserId, targetIsPrivate, viewerId, viewerContext) => {
+    if (!targetUserId) return false;
+
+    const normalizedTargetId = normalizeId(targetUserId);
+    const normalizedViewerId = normalizeId(viewerId);
+
+    if (normalizedTargetId === normalizedViewerId) {
+        return true;
+    }
+
+    if (!targetIsPrivate) {
+        return true;
+    }
+
+    return !!viewerContext?.followingIds?.has(normalizedTargetId);
+};
+
+// POST /api/users/story
+exports.uploadStory = async (req, res) => {
+    try {
+        const { mediaUrl, mediaType, caption } = req.body;
+        if (!mediaUrl) {
+            return res.status(400).json({ message: 'Media required' });
+        }
+
+        const user = await User.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        user.stories = getActiveStories(user.stories);
+        user.stories.push({
+            mediaUrl,
+            mediaType,
+            caption: typeof caption === 'string' ? caption.trim() : ''
+        });
+        await user.save();
+
+        res.status(201).json({
+            message: 'Story uploaded',
+            stories: getActiveStories(user.stories)
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+// GET /api/users/story/feed
+exports.getStoryFeed = async (req, res) => {
+    try {
+        const viewerId = normalizeId(req.user._id);
+        const viewerContext = await getViewerContext(req.user._id);
+        const followingIds = Array.from(viewerContext.followingIds);
+        const hiddenUserIds = Array.from(viewerContext.hiddenUserIds);
+
+        const userQuery = {
+            _id: { $ne: viewerId },
+            'stories.0': { $exists: true },
+            $or: [
+                { isPrivate: false },
+                { _id: { $in: followingIds } }
+            ]
+        };
+
+        if (hiddenUserIds.length > 0) {
+            userQuery._id.$nin = hiddenUserIds;
+        }
+
+        const users = await User.find(userQuery)
+            .select('username fullname avatar isPrivate stories')
+            .lean();
+
+        const feed = users
+            .map((user) => {
+                const activeStories = getActiveStories(user.stories);
+                return {
+                    ...buildStoryPayload(user, activeStories),
+                    latestStoryAt: activeStories[activeStories.length - 1]?.createdAt || null
+                };
+            })
+            .filter((user) => user.stories.length > 0)
+            .sort((a, b) => new Date(b.latestStoryAt) - new Date(a.latestStoryAt))
+            .map(({ latestStoryAt, ...user }) => user);
+
+        res.json(feed);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+// GET /api/users/story/:userId
+exports.getUserStories = async (req, res) => {
+    try {
+        const targetUserId = req.params.userId.trim();
+        const viewerId = normalizeId(req.user._id);
+
+        if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+            return res.status(400).json({ message: 'Invalid user ID format' });
+        }
+
+        const blockState = await getBlockState(req.user._id, targetUserId);
+        if (blockState.blocked) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const viewerContext = await getViewerContext(req.user._id);
+        const user = await User.findById(targetUserId)
+            .select('username fullname avatar isPrivate stories')
+            .lean();
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (!canViewStoriesForUser(user._id, user.isPrivate, viewerId, viewerContext)) {
+            return res.status(403).json({ message: 'This account is private', isPrivate: true });
+        }
+
+        const activeStories = getActiveStories(user.stories);
+        res.json(buildStoryPayload(user, activeStories));
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+// DELETE /api/users/story/:storyId
+exports.deleteStory = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const story = user.stories.id(req.params.storyId);
+        if (!story) {
+            return res.status(404).json({ message: 'Story not found' });
+        }
+
+        story.deleteOne();
+        await user.save();
+
+        res.json({ message: 'Story deleted' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+// POST /api/users/story/:userId/:storyId/view
+exports.viewStory = async (req, res) => {
+    try {
+        const targetUserId = req.params.userId.trim();
+        const viewerId = normalizeId(req.user._id);
+
+        if (!mongoose.Types.ObjectId.isValid(targetUserId) || !mongoose.Types.ObjectId.isValid(req.params.storyId)) {
+            return res.status(400).json({ message: 'Invalid story request' });
+        }
+
+        const blockState = await getBlockState(req.user._id, targetUserId);
+        if (blockState.blocked) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const viewerContext = await getViewerContext(req.user._id);
+        const user = await User.findById(targetUserId).select('isPrivate stories');
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (!canViewStoriesForUser(user._id, user.isPrivate, viewerId, viewerContext)) {
+            return res.status(403).json({ message: 'This account is private', isPrivate: true });
+        }
+
+        const story = user.stories.id(req.params.storyId);
+        if (!story || !isStoryActive(story)) {
+            return res.status(404).json({ message: 'Story not found' });
+        }
+
+        const alreadyViewed = story.views.some((storyViewerId) => normalizeId(storyViewerId) === viewerId);
+        if (!alreadyViewed && normalizeId(user._id) !== viewerId) {
+            story.views.push(req.user._id);
+            await user.save();
+        }
+
+        res.json({ message: 'Viewed' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};

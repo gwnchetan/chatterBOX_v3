@@ -23,6 +23,9 @@ const messageSchema = new mongoose.Schema({
     isDeleted: {
         type: Boolean,
         default: false
+    },
+    deletedAt: {
+        type: Date
     }
 }, {
     timestamps: true

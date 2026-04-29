@@ -18,8 +18,14 @@ router.post('/messages', chatController.sendMessage);
 // Get Messages
 router.get('/conversations/:conversationId/messages', chatController.getMessages);
 
+// Delete Message
+router.delete('/conversations/:conversationId/messages/:messageId', chatController.deleteMessage);
+
 // Mark as Read
 router.put('/conversations/:conversationId/read', chatController.markAsRead);
+
+// Delete Conversation
+router.delete('/conversations/:conversationId', chatController.deleteConversation);
 
 // Chat Requests
 router.post('/request/:conversationId/accept', chatController.acceptChatRequest);

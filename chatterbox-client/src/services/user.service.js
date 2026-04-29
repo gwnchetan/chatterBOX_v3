@@ -87,6 +87,31 @@ const userService = {
     getSavedPosts: async () => {
         const response = await api.get('/users/saved');
         return response.data;
+    },
+
+    getStoryFeed: async () => {
+        const response = await api.get('/users/story/feed');
+        return response.data;
+    },
+
+    getUserStories: async (userId) => {
+        const response = await api.get(`/users/story/${userId}`);
+        return response.data;
+    },
+
+    uploadStory: async (mediaUrl, mediaType, caption) => {
+        const response = await api.post('/users/story', { mediaUrl, mediaType, caption });
+        return response.data;
+    },
+
+    deleteStory: async (storyId) => {
+        const response = await api.delete(`/users/story/${storyId}`);
+        return response.data;
+    },
+
+    viewStory: async (userId, storyId) => {
+        const response = await api.post(`/users/story/${userId}/${storyId}/view`);
+        return response.data;
     }
 };
 

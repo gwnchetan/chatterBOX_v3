@@ -161,7 +161,7 @@ function Login() {
                 password: formData.password
             }
             : {
-                username: formData.email, // Allow email or username login
+                email: formData.email,
                 password: formData.password
             };
 

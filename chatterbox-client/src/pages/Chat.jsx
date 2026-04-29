@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import chatService from '../services/chat.service';
 import userService from '../services/user.service';
 import Navbar from '../components/layout/Navbar';
+import MobileNavbar from '../components/layout/MobileNavbar';
 import ConversationList from '../components/chat/ConversationList';
 import ChatWindow from '../components/chat/ChatWindow';
 import ChatLanding from '../components/chat/ChatLanding';
@@ -16,7 +17,8 @@ const Chat = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const { info } = useToast();
-    const [activeTab, setActiveTab] = useState('inbox');
+    const [selectedTab, setSelectedTab] = useState('inbox');
+    const notificationAudioRef = useRef(null);
 
     const currentUser = useMemo(() => {
         const user = JSON.parse(localStorage.getItem('user') || 'null');
@@ -27,9 +29,9 @@ const Chat = () => {
         };
     }, []);
 
-    const { data: conversations = [] } = useQuery({
-        queryKey: ['conversations', activeTab],
-        queryFn: () => chatService.getConversations(activeTab),
+    const { data: inboxConversations = [] } = useQuery({
+        queryKey: ['conversations', 'inbox'],
+        queryFn: () => chatService.getConversations('inbox'),
         staleTime: 1000 * 60,
         placeholderData: (previousData) => previousData
     });
@@ -52,8 +54,45 @@ const Chat = () => {
         staleTime: 1000 * 60
     });
 
-    const playNotificationSound = () => {
+    const activeTab = useMemo(() => {
+        if (conversationId && requestConversations.some((conversation) => conversation._id === conversationId)) {
+            return 'requests';
+        }
+
+        if (conversationId && sentConversations.some((conversation) => conversation._id === conversationId)) {
+            return 'sent';
+        }
+
+        if (conversationId && inboxConversations.some((conversation) => conversation._id === conversationId)) {
+            return 'inbox';
+        }
+
+        return selectedTab;
+    }, [conversationId, inboxConversations, requestConversations, selectedTab, sentConversations]);
+
+    const conversations = useMemo(() => {
+        if (activeTab === 'requests') return requestConversations;
+        if (activeTab === 'sent') return sentConversations;
+        return inboxConversations;
+    }, [activeTab, inboxConversations, requestConversations, sentConversations]);
+
+    useEffect(() => {
         const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
+        audio.preload = 'auto';
+        notificationAudioRef.current = audio;
+
+        return () => {
+            notificationAudioRef.current = null;
+        };
+    }, []);
+
+    const playNotificationSound = () => {
+        const audio = notificationAudioRef.current;
+        if (!audio) {
+            return;
+        }
+
+        audio.currentTime = 0;
         audio.play().catch(() => {});
     };
 
@@ -85,11 +124,16 @@ const Chat = () => {
                 return;
             }
 
+            if ((reason === 'request_rejected' || reason === 'request_cancelled') && updatedConversationId === conversationId.toString()) {
+                navigate('/chat');
+                return;
+            }
+
             if (updatedConversationId === conversationId.toString()) {
                 queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
             }
 
-            if (reason === 'request_created' || reason === 'request_rejected' || reason === 'request_cancelled') {
+            if (reason === 'request_created' || reason === 'request_rejected' || reason === 'request_cancelled' || reason === 'request_accepted') {
                 queryClient.invalidateQueries({ queryKey: ['notifications'] });
             }
         };
@@ -103,9 +147,16 @@ const Chat = () => {
         };
     }, [conversationId, currentUser?._id, info, navigate, queryClient]);
 
-    const activeConversation = conversations.find((conversation) => conversation._id === conversationId)
+    const activeConversation = inboxConversations.find((conversation) => conversation._id === conversationId)
         || requestConversations.find((conversation) => conversation._id === conversationId)
         || sentConversations.find((conversation) => conversation._id === conversationId);
+
+    const allConversations = useMemo(() => {
+        const merged = [...inboxConversations, ...requestConversations, ...sentConversations];
+        return merged.filter((conversation, index) => (
+            merged.findIndex((item) => item._id === conversation._id) === index
+        ));
+    }, [inboxConversations, requestConversations, sentConversations]);
 
     return (
         <div className={`chat-layout ${conversationId ? 'mobile-active-chat' : 'mobile-active-list'}`}>
@@ -114,13 +165,15 @@ const Chat = () => {
             <aside className="chat-sidebar">
                 <ConversationList
                     conversations={conversations}
+                    knownConversations={allConversations}
                     followingList={followingData?.following || []}
                     activeId={conversationId}
                     onlineUsers={new Set()}
                     currentUserId={currentUser?._id}
                     activeTab={activeTab}
-                    setActiveTab={setActiveTab}
+                    setActiveTab={setSelectedTab}
                     requestCount={requestConversations.length}
+                    sentCount={sentConversations.length}
                 />
             </aside>
 
@@ -136,6 +189,10 @@ const Chat = () => {
                     <ChatLanding />
                 )}
             </main>
+
+            <div className="chat-mobile-nav">
+                <MobileNavbar />
+            </div>
         </div>
     );
 };

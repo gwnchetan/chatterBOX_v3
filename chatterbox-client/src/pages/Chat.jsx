@@ -10,6 +10,7 @@ import ChatWindow from '../components/chat/ChatWindow';
 import ChatLanding from '../components/chat/ChatLanding';
 import { socketService } from '../services/socket.service';
 import { useToast } from '../components/Toast';
+import { getStoredUser } from '../utils/authStorage';
 import './chat.css';
 
 const Chat = () => {
@@ -21,7 +22,7 @@ const Chat = () => {
     const notificationAudioRef = useRef(null);
 
     const currentUser = useMemo(() => {
-        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        const user = getStoredUser();
         if (!user) return null;
         return {
             ...user,

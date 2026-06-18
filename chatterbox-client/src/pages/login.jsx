@@ -8,6 +8,8 @@ import loginIllustration from '../assets/login.png';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { socketService } from '../services/socket.service';
+import { useTheme } from '../hooks/useTheme';
+import { saveAuthSession } from '../utils/authStorage';
 
 function Login() {
     const navigate = useNavigate();
@@ -22,6 +24,7 @@ function Login() {
 
     const [errors, setErrors] = useState({});
     const [showPassword, setShowPassword] = useState(false);
+    const { theme, toggleTheme } = useTheme();
 
     const togglePasswordVisibility = () => {
         setShowPassword(!showPassword);
@@ -32,22 +35,6 @@ function Login() {
         setIsRegister(!isRegister);
         setErrors({}); // Clear errors on switch
         setFormData({ username: '', fullname: '', email: '', password: '', confirmPassword: '' });
-    };
-
-    // Theme Management
-    const [theme, setTheme] = useState('dark');
-
-    React.useEffect(() => {
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        setTheme(savedTheme);
-        document.documentElement.setAttribute('data-theme', savedTheme);
-    }, []);
-
-    const toggleTheme = () => {
-        const newTheme = theme === 'light' ? 'dark' : 'light';
-        setTheme(newTheme);
-        localStorage.setItem('theme', newTheme);
-        document.documentElement.setAttribute('data-theme', newTheme);
     };
 
     const handleChange = (e) => {
@@ -106,7 +93,6 @@ function Login() {
 
     const googleLogin = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
-            console.log("Google Popup Success, Token:", tokenResponse);
             try {
                 setIsLoading(true);
                 // Use api service instead of fetch
@@ -117,13 +103,11 @@ function Login() {
                 const data = res.data;
 
                 success("Google Login Successful!");
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('user', JSON.stringify(data.user)); // Fixed: data.user instead of res.data.user
+                saveAuthSession({ token: data.token, user: data.user });
                 socketService.setAuthSession({
                     token: data.token,
                     userId: data.user._id || data.user.id
                 });
-                console.log("Navigating to feed...");
                 navigate('/feed');
 
             } catch (err) {
@@ -174,9 +158,7 @@ function Login() {
             success(isRegister ? "Registration Successful! Please Login." : "Login Successful!");
 
             if (!isRegister) {
-                // Save token and user data
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('user', JSON.stringify(data.user));
+                saveAuthSession({ token: data.token, user: data.user });
                 socketService.setAuthSession({
                     token: data.token,
                     userId: data.user._id || data.user.id

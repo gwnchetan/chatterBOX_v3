@@ -15,7 +15,6 @@ const VideoPlayer = ({ media, onDoubleClick }) => {
     const containerRef = useRef(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(true);
-    const [hasInteraction, setHasInteraction] = useState(false);
 
     // 1. Build URLs (Memoized for performance)
     const { videoUrl, posterUrl, aspectRatio } = useMemo(() => {
@@ -90,7 +89,6 @@ const VideoPlayer = ({ media, onDoubleClick }) => {
             video.pause();
             setIsPlaying(false);
         }
-        setHasInteraction(true);
     };
 
     const toggleMute = (e) => {

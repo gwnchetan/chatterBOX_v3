@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useFeed } from '../../context/FeedContext';
+import { useFeed } from '../../hooks/useFeed';
 import { socketService } from '../../services/socket.service';
 import { postsService } from '../../services/posts.service';
+import { getStoredUser } from '../../utils/authStorage';
 import Avatar from '../common/Avatar';
 import ConfirmModal from '../common/ConfirmModal';
 import VideoPlayer from './VideoPlayer';
@@ -139,7 +140,7 @@ const PostCard = ({ post, onDelete }) => {
     const navigate = useNavigate();
     const toast = useToast();
     const { toggleLike, toggleRepost, toggleSave, getPost } = useFeed();
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = getStoredUser({});
     const cardRef = useRef(null);
     const sliderRef = useRef(null);
 

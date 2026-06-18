@@ -9,7 +9,7 @@ import Avatar from '../components/common/Avatar';
 import { Search } from '../components/common/Icons';
 import { useNavigate } from 'react-router-dom';
 import RightSidebar from '../components/layout/RightSidebar';
-import { useFeed } from '../context/FeedContext';
+import { useFeed } from '../hooks/useFeed';
 
 import './explore.css';
 

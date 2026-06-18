@@ -1,18 +1,9 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { postsService } from '../services/posts.service';
 import { socketService } from '../services/socket.service';
 import userService from '../services/user.service';
 import { useToast } from '../components/Toast';
-
-const FeedContext = createContext();
-
-export const useFeed = () => {
-    const context = useContext(FeedContext);
-    if (!context) {
-        throw new Error("useFeed must be used within a FeedProvider");
-    }
-    return context;
-};
+import { FeedContext } from './feedContext';
 
 export const FeedProvider = ({ children }) => {
     // We use a Map to store posts by ID to ensure consistency across different views (Feed, Explore, Profile)
@@ -143,31 +134,6 @@ export const FeedProvider = ({ children }) => {
         }
     }, [toast]);
 
-    // Action: Save
-    const toggleSave = useCallback(async (postId) => {
-        setPosts(prev => {
-            const post = prev[postId];
-            if (!post) return prev;
-            return {
-                ...prev,
-                [postId]: { ...post, saved: !post.saved }
-            };
-        });
-
-        try {
-            const post = posts[postId]; // Note: accessing state in closure might be stale, but here we just need ID
-            // Ideally we need current state logic, but toggling is simple.
-            // Wait, we need to know if we are saving or unsaving.
-            // We can determine this by checking the PREVIOUS state which we just flipped.
-            // But we can't access the state we just set immediately.
-            // Better: use the 'post' object we have in scope if we pass it, OR check the state inside setPosts but we can't await there.
-            // CORRECT APPROACH: Determine intent BEFORE setting state.
-        } catch (error) {
-            // handled below in corrected version
-        }
-    }, [posts]); // relying on posts dependency might cause frequent re-creations, but basic logic needs fix.
-
-    // Corrected Toggle Save
     const handleSave = useCallback(async (postId) => {
         let intention = 'save';
         setPosts(prev => {
@@ -198,7 +164,7 @@ export const FeedProvider = ({ children }) => {
             });
             toast.error("Failed to save");
         }
-    }, []);
+    }, [toast]);
 
     const getPost = (postId) => posts[postId];
 

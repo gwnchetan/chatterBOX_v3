@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Avatar from '../common/Avatar';
 import { Plus } from '../common/Icons';
 import userService from '../../services/user.service';
+import { getAuthSession } from '../../utils/authStorage';
 
 const INLINE_STORY_BREAKPOINT = 1300;
 
@@ -28,8 +29,7 @@ const hasUnseenStories = (storyOwner, viewerId) => (
 const StoryRail = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
-    const currentUserId = currentUser?._id || currentUser?.id || null;
+    const { user: currentUser, userId: currentUserId } = getAuthSession();
     const [showInlineRail, setShowInlineRail] = useState(() => (
         typeof window === 'undefined' ? false : window.innerWidth <= INLINE_STORY_BREAKPOINT
     ));

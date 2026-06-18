@@ -18,8 +18,9 @@ import MobileNavbar from '../components/layout/MobileNavbar';
 import './profile.css';
 import LogoLoader from '../components/common/LogoLoader';
 import RightSidebar from '../components/layout/RightSidebar';
-import { useFeed } from '../context/FeedContext';
+import { useFeed } from '../hooks/useFeed';
 import { socketService } from '../services/socket.service';
+import { getAuthSession } from '../utils/authStorage';
 
 const Profile = () => {
     const { userId: paramId } = useParams();
@@ -30,8 +31,7 @@ const Profile = () => {
     const queryClient = useQueryClient();
 
     // 1. Resolve effective userId
-    const storedUser = JSON.parse(localStorage.getItem('user'));
-    const currentUserId = storedUser ? (storedUser.id || storedUser._id) : null;
+    const { userId: currentUserId } = getAuthSession();
 
     // Determine the ID to fetch (param or current user)
     const targetUserId = paramId || currentUserId;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useUpload } from '../../context/UploadContext';
+import { useUpload } from '../../hooks/useUpload';
 import { RefreshCw, X, Check, AlertCircle } from './Icons';
 import './UploadProgress.css';
 

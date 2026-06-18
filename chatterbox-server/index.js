@@ -1,10 +1,12 @@
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
+const path = require('path');
+const dotenv = require('dotenv');
 const ConnectDB = require('./db');
-require('dotenv').config();
-// Force restart
 
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+// Force restart
 
 ConnectDB();
 
@@ -19,8 +21,6 @@ const io = initSocket(server);
 app.set('io', io);
 
 const PORT = process.env.PORT || 5000;
-
-const path = require('path');
 
 app.use(compression()); // Compress all routes
 app.use(cors());

@@ -5,9 +5,6 @@ import react from '@vitejs/plugin-react'
 // Trigger rebuild
 export default defineConfig({
   plugins: [react()],
-  optimizeDeps: {
-    exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
-  },
   server: {
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
@@ -19,7 +16,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          ffmpeg: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
           utils: ['axios', 'socket.io-client']
         },
       },

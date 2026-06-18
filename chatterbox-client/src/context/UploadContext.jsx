@@ -1,12 +1,9 @@
-import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { cloudinaryService } from '../services/cloudinary.service';
 import { postsService } from '../services/posts.service';
 import getCroppedImg from '../utils/cropUtils';
 import { useToast } from '../components/Toast';
-
-const UploadContext = createContext();
-
-export const useUpload = () => useContext(UploadContext);
+import { UploadContext } from './uploadContext';
 
 export const UploadProvider = ({ children }) => {
     // Queue of upload tasks. 
@@ -18,7 +15,7 @@ export const UploadProvider = ({ children }) => {
     // Generate a unique ID for each upload
     const generateId = () => Date.now().toString();
 
-    const startUpload = (payload) => {
+    const startUpload = useCallback((payload) => {
         const id = generateId();
         const newUpload = {
             id,
@@ -32,7 +29,23 @@ export const UploadProvider = ({ children }) => {
 
         setQueue(prev => [...prev, newUpload]);
         return id;
-    };
+    }, []);
+
+    const updateStatus = useCallback((id, status, progress, errorMsg = null) => {
+        setQueue(prev => prev.map(item =>
+            item.id === id ? { ...item, status, progress, errorMsg } : item
+        ));
+    }, []);
+
+    const removeUpload = useCallback((id) => {
+        setQueue(prev => prev.filter(item => item.id !== id));
+    }, []);
+
+    const retryUpload = useCallback((id) => {
+        setQueue(prev => prev.map(item =>
+            item.id === id ? { ...item, status: 'pending', errorMsg: null, progress: 0 } : item
+        ));
+    }, []);
 
     /**
      * PROCESS QUEUE
@@ -101,7 +114,7 @@ export const UploadProvider = ({ children }) => {
                             height: uploaded.height
                         });
                     }
-                    // C. GIF / Existing
+                    // C. Existing remote media
                     else {
                         finalMediaPayload.push({ ...item });
                         // Instant progress for non-uploads
@@ -142,25 +155,7 @@ export const UploadProvider = ({ children }) => {
         };
 
         processNext();
-    }, [queue, isProcessing]);
-
-
-    // Helpers
-    const updateStatus = (id, status, progress, errorMsg = null) => {
-        setQueue(prev => prev.map(item =>
-            item.id === id ? { ...item, status, progress, errorMsg } : item
-        ));
-    };
-
-    const removeUpload = (id) => {
-        setQueue(prev => prev.filter(item => item.id !== id));
-    };
-
-    const retryUpload = (id) => {
-        setQueue(prev => prev.map(item =>
-            item.id === id ? { ...item, status: 'pending', errorMsg: null, progress: 0 } : item
-        ));
-    };
+    }, [isProcessing, queue, removeUpload, toast, updateStatus]);
 
     return (
         <UploadContext.Provider value={{ startUpload, queue, removeUpload, retryUpload }}>

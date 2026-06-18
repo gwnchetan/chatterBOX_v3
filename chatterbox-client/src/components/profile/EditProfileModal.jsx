@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import { useToast } from '../Toast';
 import userService from '../../services/user.service';
 import { cloudinaryService } from '../../services/cloudinary.service';
-import { Camera, X, Upload } from '../common/Icons';
+import { Camera, X } from '../common/Icons';
+import { updateStoredUser } from '../../utils/authStorage';
 import './EditProfileModal.css';
 
 const EditProfileModal = ({ profile, isOpen, onClose, onUpdate }) => {
@@ -64,9 +65,7 @@ const EditProfileModal = ({ profile, isOpen, onClose, onUpdate }) => {
             };
             const res = await userService.updateProfile(payload);
 
-            // Update local storage too so Navbar updates
-            const user = JSON.parse(localStorage.getItem('user'));
-            localStorage.setItem('user', JSON.stringify({ ...user, ...res.user }));
+            updateStoredUser(res.user);
 
             onUpdate(res.user);
             toast.success("Profile updated!");

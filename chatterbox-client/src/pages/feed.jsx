@@ -13,7 +13,8 @@ import Avatar from '../components/common/Avatar';
 import BrandLogo from '../components/common/BrandLogo';
 import { Bell } from '../components/common/Icons';
 import { postsService } from '../services/posts.service';
-import { useFeed } from '../context/FeedContext';
+import { useFeed } from '../hooks/useFeed';
+import { getAuthSession } from '../utils/authStorage';
 import './feed.css';
 
 const FEED_SECTIONS = [
@@ -38,8 +39,7 @@ const Feed = () => {
     const [activeSection, setActiveSection] = useState('friends');
     const queryClient = useQueryClient();
     const { posts: allPosts, mergePosts } = useFeed();
-    const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
-    const currentUserId = currentUser?._id || currentUser?.id || '';
+    const { user: currentUser, userId: currentUserId = '' } = getAuthSession();
 
     const {
         data,
@@ -74,7 +74,7 @@ const Feed = () => {
     useEffect(() => {
         const handleNewPost = (event) => {
             const newPost = event.detail;
-            const user = JSON.parse(localStorage.getItem('user') || 'null');
+            const user = getAuthSession().user;
             if (!user) return;
 
             const postWithAuthor = {

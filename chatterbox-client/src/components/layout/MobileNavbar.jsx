@@ -2,6 +2,7 @@ import React from 'react';
 import './MobileNavbar.css';
 import { Home, Search, MessageSquare, User, Plus } from '../common/Icons';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { getAuthSession } from '../../utils/authStorage';
 
 const MobileNavbar = () => {
     const navigate = useNavigate();
@@ -12,8 +13,7 @@ const MobileNavbar = () => {
     const isChatActive = () => location.pathname === '/chat' || location.pathname.startsWith('/chat/');
 
     const isProfileActive = () => {
-        const user = JSON.parse(localStorage.getItem('user'));
-        const myId = user ? (user.id || user._id) : null;
+        const { userId: myId } = getAuthSession();
         return location.pathname === '/profile' || (myId && location.pathname === `/profile/${myId}`);
     };
 
@@ -59,8 +59,8 @@ const MobileNavbar = () => {
                 <button
                     className={`mobile-nav-item ${isProfileActive() ? 'active' : ''}`}
                     onClick={() => {
-                        const user = JSON.parse(localStorage.getItem('user')) || {};
-                        navigate(`/profile/${user.id || user._id}`);
+                        const { userId } = getAuthSession();
+                        navigate(userId ? `/profile/${userId}` : '/profile');
                     }}
                 >
                     <div className="icon-wrapper">

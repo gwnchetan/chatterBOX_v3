@@ -5,11 +5,13 @@ import BrandLogo from '../common/BrandLogo';
 import { Home, Grid, Bookmark, Send, BarChart, Settings, LogOut, User, Plus, MessageSquare } from '../common/Icons';
 import SettingsModal from '../common/SettingsModal';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { socketService } from '../../services/socket.service';
+import useLogout from '../../hooks/useLogout';
+import { getStoredUser, getUserId } from '../../utils/authStorage';
 
 const Navbar = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const logout = useLogout();
 
     // Auto-collapse on tablet (<= 1100px)
     const [isCollapsed, setIsCollapsed] = useState(window.innerWidth <= 1100);
@@ -32,8 +34,8 @@ const Navbar = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Get user info from localStorage (fallback to default)
-    const user = JSON.parse(localStorage.getItem('user')) || { fullname: 'Cyndy Lillibridge', username: 'cyndyui' };
+    const user = getStoredUser({ fullname: 'User', username: 'user' });
+    const userId = getUserId(user);
 
     // Determine active link based on current path
     const getActiveLink = (path) => {
@@ -45,9 +47,7 @@ const Navbar = () => {
         if (path === '/settings') return 'Settings';
         if (path === '/create') return 'Create';
 
-        // Exact match for my profile
-        const myId = user.id || user._id;
-        if (path === '/profile' || (myId && path === `/profile/${myId}`)) {
+        if (path === '/profile' || (userId && path === `/profile/${userId}`)) {
             return 'Profile';
         }
 
@@ -74,13 +74,6 @@ const Navbar = () => {
         navigate(path);
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        socketService.clearAuthSession();
-        navigate('/');
-    };
-
     return (
         <nav className={`navbar ${isCollapsed ? 'collapsed' : ''}`}>
 
@@ -99,7 +92,7 @@ const Navbar = () => {
             <ul className="nav-menu">
                 <li
                     className={`nav-item ${activeLink === 'Profile' ? 'active' : ''}`}
-                    onClick={() => handleNavigation(`/profile/${user.id || user._id}`)}
+                    onClick={() => handleNavigation(userId ? `/profile/${userId}` : '/profile')}
                 >
                     <div className="nav-link">
                         <span className="nav-icon"><User /></span>
@@ -135,7 +128,7 @@ const Navbar = () => {
                     )}
                 </div>
 
-                <div className="logout-btn" onClick={handleLogout}>
+                <div className="logout-btn" onClick={logout}>
                     <LogOut />
                     {!isCollapsed && <span>Logout</span>}
                 </div>

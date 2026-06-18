@@ -6,6 +6,7 @@ import LogoLoader from '../components/common/LogoLoader';
 import { ChevronLeft, ChevronRight, Trash, Volume2, VolumeX, X } from '../components/common/Icons';
 import { useToast } from '../components/Toast';
 import userService from '../services/user.service';
+import { getAuthSession } from '../utils/authStorage';
 import './story-viewer.css';
 
 const IMAGE_STORY_DURATION_MS = 5000;
@@ -37,8 +38,7 @@ const StoryViewer = () => {
     const videoRef = useRef(null);
     const initializedStoryKeyRef = useRef('');
 
-    const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
-    const currentUserId = currentUser?._id || currentUser?.id || null;
+    const { userId: currentUserId } = getAuthSession();
     const fromPath = location.state?.from || '/feed';
 
     const [activeStoryIndex, setActiveStoryIndex] = useState(0);

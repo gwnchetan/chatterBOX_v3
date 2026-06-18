@@ -28,7 +28,6 @@ const VideoEditor = ({ videoSrc, onSave, onCancel }) => {
     const [trim, setTrim] = useState({ start: 0, end: 0 });
 
     // Final Output State
-    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null); // Used for thumbnail capture only
     const [croppedAreaNormalized, setCroppedAreaNormalized] = useState(null); // The intent to save
 
     // Sync state with the ACTUAL visible video element rendered by react-easy-crop
@@ -59,7 +58,7 @@ const VideoEditor = ({ videoSrc, onSave, onCancel }) => {
 
                 // 2. Sync Playback Command
                 if (isPlaying) {
-                    visibleVideo.play().catch(e => console.log("Autoplay blocked", e));
+                    visibleVideo.play().catch(() => {});
                 } else {
                     visibleVideo.pause();
                 }
@@ -124,9 +123,8 @@ const VideoEditor = ({ videoSrc, onSave, onCancel }) => {
     /**
      * CROPPING CALLBACK (React Easy Crop)
      */
-    const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
+    const onCropComplete = useCallback((croppedArea) => {
         setCroppedAreaNormalized(croppedArea); // The 0-1 intent
-        setCroppedAreaPixels(croppedAreaPixels); // Absolute pixels (for thumbnail only)
     }, []);
 
     /**
@@ -169,10 +167,10 @@ const VideoEditor = ({ videoSrc, onSave, onCancel }) => {
                 end: trim.end
             },
             crop: {
-                x: croppedAreaNormalized.x / 100, // library gives 0-100, we want 0-1
-                y: croppedAreaNormalized.y / 100,
-                w: croppedAreaNormalized.width / 100,
-                h: croppedAreaNormalized.height / 100
+                x: (croppedAreaNormalized?.x || 0) / 100,
+                y: (croppedAreaNormalized?.y || 0) / 100,
+                w: (croppedAreaNormalized?.width || 100) / 100,
+                h: (croppedAreaNormalized?.height || 100) / 100
             }
         };
 

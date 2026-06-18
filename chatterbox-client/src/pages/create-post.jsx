@@ -7,14 +7,14 @@ import getCroppedImg from '../utils/cropUtils';
 import { validateMediaAddition } from '../utils/mediaRules';
 import { cloudinaryService } from '../services/cloudinary.service';
 import userService from '../services/user.service';
+import { getStoredUser } from '../utils/authStorage';
 import './create-post.css';
 
 
 
-import { useUpload } from '../context/UploadContext';
+import { useUpload } from '../hooks/useUpload';
 
 const EmojiPicker = lazy(() => import('emoji-picker-react'));
-const GiphyPicker = lazy(() => import('../components/create/GiphyPicker'));
 const ImageEditor = lazy(() => import('../components/create/ImageEditor'));
 const VideoEditor = lazy(() => import('../components/create/VideoEditor'));
 
@@ -28,7 +28,6 @@ const CreatePost = () => {
     const [caption, setCaption] = useState('');
     const [media, setMedia] = useState([]); // [{ type, file, previewUrl, ...metadata }]
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-    const [showGiphyPicker, setShowGiphyPicker] = useState(false);
 
     // Editor State
     const [editingIndex, setEditingIndex] = useState(null);
@@ -90,10 +89,10 @@ const CreatePost = () => {
                     // Upload to Cloudinary — same as post flow
                     const uploaded = await cloudinaryService.uploadMedia(item.file);
                     mediaUrl = uploaded.url;
-                    mediaType = item.type === 'gif' ? 'image' : item.type;
+                    mediaType = item.type;
                 } else {
                     mediaUrl = item.url;
-                    mediaType = item.type === 'gif' ? 'image' : item.type;
+                    mediaType = item.type;
                 }
             }
 
@@ -163,23 +162,6 @@ const CreatePost = () => {
 
         if (errorMsg) toast.error(errorMsg);
         e.target.value = '';
-    };
-
-    const handleGiphySelect = (gif) => {
-        const validation = validateMediaAddition(media, 'gif');
-        if (!validation.valid) {
-            toast.error(validation.error);
-            return;
-        }
-
-        setMedia(prev => [...prev, {
-            type: 'gif',
-            url: gif.url,
-            previewUrl: gif.previewUrl,
-            provider: 'giphy',
-            publicId: gif.id
-        }]);
-        setShowGiphyPicker(false);
     };
 
     const removeMedia = (index) => {
@@ -389,7 +371,7 @@ const CreatePost = () => {
                     <div className="content-section">
                         <div className="user-mini-header">
                             <span className="user-username">
-                                {JSON.parse(localStorage.getItem('user'))?.username || 'user'}
+                                {getStoredUser()?.username || 'user'}
                             </span>
                         </div>
                         <textarea
@@ -423,17 +405,6 @@ const CreatePost = () => {
                     </div>
                 )}
             </div>
-
-            {
-                showGiphyPicker && (
-                    <Suspense fallback={<div className="create-inline-loader create-modal-loader">Loading GIFs...</div>}>
-                        <GiphyPicker
-                            onSelect={handleGiphySelect}
-                            onClose={() => setShowGiphyPicker(false)}
-                        />
-                    </Suspense>
-                )
-            }
         </div >
     );
 };

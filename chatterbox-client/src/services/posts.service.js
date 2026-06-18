@@ -1,16 +1,9 @@
 import api from './api';
+import { getAuthSession } from '../utils/authStorage';
 
 const verifyAuth = () => {
-    const user = JSON.parse(localStorage.getItem('user'));
-    const token = localStorage.getItem('token');
-
-    if ((!user && !token) || (!user?.token && !token)) {
-        // If neither are present (or if user is present but no token anywhere)
-        // Actually, if we have a token, we are effectively authenticated for the API's sake.
-        // But we usually want a user object too.
-    }
-
-    if (!token && (!user || !user.token)) {
+    const { isAuthenticated } = getAuthSession();
+    if (!isAuthenticated) {
         throw new Error('User not authenticated');
     }
 };

@@ -3,8 +3,8 @@
  * 
  * Rules:
  * 1. Max 5 total items.
- * 2. Max 1 video (Exclusive: No images/GIFs if video present).
- * 3. Mixed Giphy + Images allowed (<= 5).
+ * 2. Max 1 video (exclusive: no images if video present).
+ * 3. Images can be grouped up to the total media limit.
  * 4. Video cannot be mixed with any other media.
  */
 
@@ -12,8 +12,8 @@ export const MAX_MEDIA_COUNT = 5;
 
 /**
  * Validates if a new item can be added to the current media list.
- * @param {Array} currentMedia - Array of current media objects { type: 'image' | 'video' | 'gif' }
- * @param {string} newItemType - 'image', 'video', or 'gif'
+ * @param {Array} currentMedia - Array of current media objects { type: 'image' | 'video' }
+ * @param {string} newItemType - 'image' or 'video'
  * @returns {object} { valid: boolean, error: string | null }
  */
 export const validateMediaAddition = (currentMedia, newItemType) => {

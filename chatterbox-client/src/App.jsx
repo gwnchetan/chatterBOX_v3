@@ -5,6 +5,7 @@ import ProtectedRoute from './components/common/ProtectedRoute';
 import { FeedProvider } from './context/FeedContext';
 import { useToast } from './components/Toast';
 import { socketService } from './services/socket.service';
+import { getAuthSession } from './utils/authStorage';
 import './App.css';
 
 const Login = lazy(() => import('./pages/login'));
@@ -39,13 +40,12 @@ function App() {
     const seenMessageToastsRef = useRef(new Set());
 
     useEffect(() => {
-        const user = JSON.parse(localStorage.getItem('user') || 'null');
-        const token = localStorage.getItem('token');
+        const { user, token, userId } = getAuthSession();
 
         if (user && token) {
             socketService.setAuthSession({
                 token,
-                userId: user._id || user.id
+                userId
             });
         } else {
             socketService.clearAuthSession();

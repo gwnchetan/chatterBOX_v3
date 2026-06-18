@@ -7,6 +7,7 @@ import NotificationItem from '../notifications/NotificationItem';
 import '../notifications/notifications.css';
 import './Layout.css';
 import { Bell, Plus } from '../common/Icons';
+import { getAuthSession } from '../../utils/authStorage';
 
 const DESKTOP_SIDEBAR_BREAKPOINT = 1300;
 
@@ -14,8 +15,7 @@ const RightSidebar = () => {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
     const location = useLocation();
-    const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
-    const currentUserId = currentUser?._id || currentUser?.id || null;
+    const { user: currentUser, userId: currentUserId } = getAuthSession();
     const [isDesktopSidebar, setIsDesktopSidebar] = useState(() => (
         typeof window === 'undefined' ? true : window.innerWidth > DESKTOP_SIDEBAR_BREAKPOINT
     ));

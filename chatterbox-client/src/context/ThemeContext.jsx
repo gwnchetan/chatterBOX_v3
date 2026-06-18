@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-
-const ThemeContext = createContext();
+import React, { useEffect, useState } from 'react';
+import { ThemeContext } from './themeContext';
 
 export const ThemeProvider = ({ children }) => {
     // Default to dark if no preference is saved
@@ -33,10 +32,3 @@ export const ThemeProvider = ({ children }) => {
     );
 };
 
-export const useTheme = () => {
-    const context = useContext(ThemeContext);
-    if (!context) {
-        throw new Error('useTheme must be used within a ThemeProvider');
-    }
-    return context;
-};

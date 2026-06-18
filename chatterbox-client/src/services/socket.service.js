@@ -1,4 +1,5 @@
 import { io } from 'socket.io-client';
+import { getAuthSession } from '../utils/authStorage';
 
 const SOCKET_URL = import.meta.env.MODE === 'production' ? '/' : 'http://localhost:5000';
 
@@ -26,9 +27,7 @@ class SocketService {
     }
 
     restoreSession() {
-        const token = localStorage.getItem('token');
-        const user = JSON.parse(localStorage.getItem('user') || 'null');
-        const userId = user?._id || user?.id;
+        const { token, userId } = getAuthSession();
 
         if (!token || !userId) {
             this.clearAuthSession();

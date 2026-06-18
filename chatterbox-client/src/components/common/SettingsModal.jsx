@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from '../../hooks/useTheme';
 import { X, Moon, Sun, Lock } from './Icons';
 import userService from '../../services/user.service';
 import Avatar from './Avatar';
+import { getAuthSession } from '../../utils/authStorage';
 
 const SettingsModal = ({ isOpen, onClose }) => {
     const { theme, setMode } = useTheme();
@@ -15,11 +16,11 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
         const fetchSettings = async () => {
             try {
-                const user = JSON.parse(localStorage.getItem('user') || 'null');
-                if (!user) return;
+                const { userId } = getAuthSession();
+                if (!userId) return;
 
                 const [profileData, blockedData] = await Promise.all([
-                    userService.getProfile(user._id || user.id),
+                    userService.getProfile(userId),
                     userService.getBlockedUsers()
                 ]);
 

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { socketService } from './socket.service';
+import { clearStoredAuth, getStoredToken, getStoredUser } from '../utils/authStorage';
 
 const API_URL = import.meta.env.MODE === 'production' ? '/api' : 'http://localhost:5000/api';
 
@@ -11,11 +12,10 @@ const api = axios.create({
 });
 
 // Request interceptor to add auth token
-// Request interceptor to add auth token
 api.interceptors.request.use(
     (config) => {
-        const user = JSON.parse(localStorage.getItem('user'));
-        const token = localStorage.getItem('token') || (user && user.token);
+        const user = getStoredUser();
+        const token = getStoredToken() || user?.token;
 
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
@@ -34,8 +34,7 @@ api.interceptors.response.use(
     },
     async (error) => {
         if (error.response?.status === 401) {
-            localStorage.removeItem('user');
-            localStorage.removeItem('token');
+            clearStoredAuth();
             socketService.clearAuthSession();
             // Only redirect if not already at login
             if (window.location.pathname !== '/' && !window.location.pathname.includes('/login')) {

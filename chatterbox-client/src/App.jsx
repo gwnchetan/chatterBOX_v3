@@ -2,7 +2,7 @@ import React, { Suspense, lazy, useEffect, useRef } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import ProtectedRoute from './components/common/ProtectedRoute';
-import { FeedProvider } from './context/FeedContext';
+import { FeedProvider } from './context/FeedContext.jsx';
 import { useToast } from './components/Toast';
 import { socketService } from './services/socket.service';
 import { getAuthSession } from './utils/authStorage';

@@ -8,8 +8,8 @@ import { ToastProvider } from './components/Toast.jsx'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID_HERE";
 
-import { ThemeProvider } from './context/ThemeContext';
-import { UploadProvider } from './context/UploadContext';
+import { ThemeProvider } from './context/ThemeContext.jsx';
+import { UploadProvider } from './context/UploadContext.jsx';
 import UploadProgress from './components/common/UploadProgress';
 
 import { QueryClientProvider } from '@tanstack/react-query';
